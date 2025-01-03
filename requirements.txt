@@ -1,0 +1,15 @@
+# Core dependencies
+python-dateutil>=2.8.2
+pytz>=2023.3
+PyQt6>=6.6.1  # Interface graphique moderne
+PyQt6-Qt6>=6.6.1  # Composants Qt6
+PyQt6-sip>=13.6.0  # Bindings SIP pour PyQt6
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-qt>=4.2.0  # Tests pour PyQt
+
+# Utilities
+rich>=13.5.2  # Pour un affichage amélioré dans le terminal
+loguru>=0.7.0  # Pour la gestion avancée des logs
