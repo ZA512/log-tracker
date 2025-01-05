@@ -127,6 +127,34 @@ class Database:
         self.connect()
         try:
             cursor = self.conn.cursor()
+            
+            # Si un projet est spécifié par son nom, on le crée ou on le récupère
+            if project_id and isinstance(project_id, str):
+                cursor.execute("SELECT id FROM projects WHERE name = ?", (project_id,))
+                row = cursor.fetchone()
+                if row:
+                    project_id = row[0]
+                else:
+                    cursor.execute("INSERT INTO projects (name) VALUES (?)", (project_id,))
+                    project_id = cursor.lastrowid
+            
+            # Si un ticket est spécifié, on le crée ou on le récupère
+            if ticket_id and project_id and isinstance(ticket_id, str):
+                cursor.execute(
+                    "SELECT id FROM tickets WHERE project_id = ? AND ticket_number = ?",
+                    (project_id, ticket_id)
+                )
+                row = cursor.fetchone()
+                if row:
+                    ticket_id = row[0]
+                else:
+                    cursor.execute(
+                        "INSERT INTO tickets (project_id, ticket_number) VALUES (?, ?)",
+                        (project_id, ticket_id)
+                    )
+                    ticket_id = cursor.lastrowid
+            
+            # Ajoute l'entrée
             cursor.execute(
                 """
                 INSERT INTO entries 
@@ -243,17 +271,17 @@ class Database:
         Returns:
             Dict avec les informations du ticket ou None si pas de ticket
         """
-        query = """
-            SELECT t.* 
-            FROM tickets t
-            JOIN entries e ON e.ticket_id = t.id
-            WHERE t.project_id = ?
-            ORDER BY e.timestamp DESC
-            LIMIT 1
-        """
-        
+        self.connect()
         try:
             cursor = self.conn.cursor()
+            query = """
+                SELECT t.* 
+                FROM tickets t
+                JOIN entries e ON e.ticket_id = t.id
+                WHERE t.project_id = ?
+                ORDER BY e.timestamp DESC
+                LIMIT 1
+            """
             cursor.execute(query, (project_id,))
             row = cursor.fetchone()
             
@@ -268,6 +296,8 @@ class Database:
         except Exception as e:
             print(f"Erreur lors de la récupération du dernier ticket : {str(e)}")
             return None
+        finally:
+            self.disconnect()
     
     def get_entries_for_day(self, date):
         """
@@ -357,6 +387,25 @@ class Database:
         finally:
             self.disconnect()
 
+    def get_project_by_name(self, name):
+        """
+        Récupère un projet par son nom.
+        
+        Args:
+            name: Nom du projet
+            
+        Returns:
+            Dict avec les informations du projet ou None si pas trouvé
+        """
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM projects WHERE name = ?", (name,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            self.disconnect()
+    
     def get_project_suggestions(self):
         """Retourne la liste des noms de projets pour l'auto-complétion."""
         self.connect()
@@ -373,9 +422,12 @@ class Database:
         except Exception as e:
             print(f"Erreur lors de la récupération des suggestions de projets : {str(e)}")
             return []
+        finally:
+            self.disconnect()
 
     def get_ticket_suggestions(self):
         """Retourne la liste des numéros de tickets pour l'auto-complétion."""
+        self.connect()
         try:
             cursor = self.conn.cursor()
             cursor.execute("""
@@ -389,3 +441,5 @@ class Database:
         except Exception as e:
             print(f"Erreur lors de la récupération des suggestions de tickets : {str(e)}")
             return []
+        finally:
+            self.disconnect()
