@@ -7,10 +7,11 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QTextEdit, QTreeWidget, QTreeWidgetItem,
     QFrame, QSpinBox, QComboBox, QRadioButton, QButtonGroup, QGroupBox,
-    QSplitter, QDialog, QFormLayout
+    QSplitter, QDialog, QFormLayout, QStyle, QToolButton
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtCore import Qt, QTimer, QSize
+from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
+import os
 
 print("Importing database...")
 from utils.database import Database
@@ -18,6 +19,7 @@ print("Importing autocomplete...")
 from utils.autocomplete import AutocompleteLineEdit
 from ui.ticket_combo import TicketComboBox
 from ui.project_combo import ProjectComboBox
+from ui.config_dialog import ConfigDialog
 
 print("Starting application...")
 
@@ -417,74 +419,166 @@ class LogTrackerApp(QMainWindow):
         self.db = Database()
         self.entry_dialog = None
         self.entries_dialog = None
+        self.config_dialog = None
         self.setup_ui()
         self.setup_timer()
         print("LogTrackerApp initialized")
 
+    def load_svg_icon(self, filename):
+        """Charge une icône SVG depuis le dossier resources."""
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'resources', filename)
+        return QIcon(path)
+
     def setup_ui(self):
         """Configure l'interface utilisateur."""
-        print("Setting up LogTrackerApp UI...")
-        self.setWindowTitle("LogTracker")
-        self.setFixedSize(300, 100)
+        self.setWindowTitle("Log Tracker")
+        self.resize(300, 100)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #1e1e1e;
+            }
+            QWidget {
+                background-color: #1e1e1e;
+                color: #d0d0d1;
+            }
+            QToolButton {
+                border: none;
+                padding: 5px;
+                color: #d0d0d1;
+            }
+            QToolButton:hover {
+                background-color: #333333;
+                border-radius: 3px;
+            }
+            QLabel {
+                color: #d0d0d1;
+                font-size: 13px;
+                background: transparent;
+            }
+            QFrame[frameShape="4"] {  /* HLine */
+                background-color: #333333;
+                max-height: 1px;
+                border: none;
+            }
+        """)
 
         # Widget central
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(0)  # Réduit l'espacement vertical
 
-        # Résumé
-        self.summary_label = QLabel("Aucune entrée aujourd'hui")
-        layout.addWidget(self.summary_label)
+        # Barre d'outils supérieure
+        toolbar = QHBoxLayout()
+        toolbar.setSpacing(2)
 
-        # Boutons
-        buttons_layout = QHBoxLayout()
+        # Fonction pour créer un bouton avec une icône SVG colorée
+        def create_tool_button(icon_name, tooltip, callback):
+            button = QToolButton()
+            icon = self.load_svg_icon(icon_name)
+            # Force la couleur de l'icône en blanc
+            pixmap = icon.pixmap(QSize(16, 16))
+            painter = QPainter(pixmap)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            painter.fillRect(pixmap.rect(), QColor("#d0d0d1"))
+            painter.end()
+            button.setIcon(QIcon(pixmap))
+            button.setIconSize(QSize(16, 16))
+            button.setToolTip(tooltip)
+            button.clicked.connect(callback)
+            return button
 
-        new_entry_button = QPushButton("Nouvelle entrée")
-        new_entry_button.clicked.connect(self.show_entry_dialog)
-        buttons_layout.addWidget(new_entry_button)
+        # Création des boutons avec les icônes colorées
+        add_button = create_tool_button('plus.svg', "Nouvelle entrée", self.show_entry_dialog)
+        list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
+        config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
 
-        view_entries_button = QPushButton("Voir les entrées")
-        view_entries_button.clicked.connect(self.show_entries_dialog)
-        buttons_layout.addWidget(view_entries_button)
+        # Ajout des boutons à la barre d'outils
+        toolbar.addWidget(add_button)
+        toolbar.addWidget(list_button)
+        toolbar.addStretch()
+        toolbar.addWidget(config_button)
 
-        layout.addLayout(buttons_layout)
+        main_layout.addLayout(toolbar)
 
-        # Met à jour le résumé
-        self.update_summary()
-        print("LogTrackerApp UI set up")
+        # Zone d'information avec icônes
+        info_layout = QHBoxLayout()
+        info_layout.setContentsMargins(0, 5, 0, 5)
+        
+        # Temps actuel avec icône d'horloge
+        current_time_layout = QHBoxLayout()
+        current_time_layout.setSpacing(5)
+        
+        # Création de l'icône d'horloge colorée
+        clock_icon = QLabel()
+        clock_pixmap = self.load_svg_icon('clock.svg').pixmap(QSize(14, 14))
+        painter = QPainter(clock_pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(clock_pixmap.rect(), QColor("#d0d0d1"))
+        painter.end()
+        clock_icon.setPixmap(clock_pixmap)
+        
+        self.current_time_label = QLabel("00:00")
+        current_time_layout.addWidget(clock_icon)
+        current_time_layout.addWidget(self.current_time_label)
+        
+        # Temps total avec icône de somme
+        total_time_layout = QHBoxLayout()
+        total_time_layout.setSpacing(5)
+        
+        # Création de l'icône sigma colorée
+        total_icon = QLabel()
+        sigma_pixmap = self.load_svg_icon('sigma.svg').pixmap(QSize(14, 14))
+        painter = QPainter(sigma_pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(sigma_pixmap.rect(), QColor("#d0d0d1"))
+        painter.end()
+        total_icon.setPixmap(sigma_pixmap)
+        
+        self.total_time_label = QLabel("0h00")
+        total_time_layout.addWidget(total_icon)
+        total_time_layout.addWidget(self.total_time_label)
+        
+        info_layout.addLayout(current_time_layout)
+        info_layout.addWidget(QLabel(" | "))  # Séparateur vertical
+        info_layout.addLayout(total_time_layout)
+        info_layout.addStretch()
+        
+        main_layout.addLayout(info_layout)
 
     def setup_timer(self):
         """Configure le timer pour les rappels."""
-        print("Setting up timer...")
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_last_entry)
-        self.timer.start(30 * 60 * 1000)
-        print("Timer set up")
+        self.timer.timeout.connect(self.update_summary)  # Ajout de la mise à jour du résumé
+        self.timer.start(60000)  # Vérifie toutes les minutes
+        self.update_summary()  # Met à jour immédiatement au démarrage
 
     def update_summary(self):
         """Met à jour le résumé des entrées."""
-        print("Updating summary...")
         try:
             # Récupère les entrées du jour
             today = datetime.now().date()
             entries = self.db.get_entries_for_day(today)
 
+            # Calcul du temps total
+            total_time = sum(entry['duration'] or 0 for entry in entries)
+            hours = total_time // 60
+            minutes = total_time % 60
+            self.total_time_label.setText(f"{hours}h{minutes:02d}")
+
+            # Mise à jour du temps actuel
             if entries:
-                # Dernière entrée (première de la liste car triée par ordre décroissant)
-                last_entry = entries[0]
-                time_str = datetime.fromisoformat(last_entry['timestamp']).strftime("%H:%M")
-
-                # Temps total
-                total_time = sum(entry['duration'] or 0 for entry in entries)
-                hours = total_time // 60
-                minutes = total_time % 60
-
-                # Affiche tout sur une ligne
-                summary_text = f"Dernier : {time_str} | aujourd'hui {hours}h{minutes:02d}"
-                self.summary_label.setText(summary_text)
+                last_entry = entries[0]  # Dernière entrée
+                last_time = datetime.fromisoformat(last_entry['timestamp'])
+                elapsed_minutes = int((datetime.now() - last_time).total_seconds() / 60)
+                hours = elapsed_minutes // 60
+                minutes = elapsed_minutes % 60
+                self.current_time_label.setText(f"{hours:02d}:{minutes:02d}")
             else:
-                self.summary_label.setText("Aucune entrée aujourd'hui")
+                self.current_time_label.setText("00:00")
         except Exception as e:
             print(f"Erreur lors de la mise à jour du résumé : {str(e)}")
 
@@ -503,6 +597,12 @@ class LogTrackerApp(QMainWindow):
         if self.entries_dialog is None:
             self.entries_dialog = EntriesDialog(self, self.db)
         self.entries_dialog.show()
+
+    def show_config_dialog(self):
+        """Affiche la fenêtre de configuration."""
+        if not self.config_dialog:
+            self.config_dialog = ConfigDialog(self)
+        self.config_dialog.show()
 
     def check_last_entry(self):
         """Vérifie la dernière entrée et affiche une notification si nécessaire."""
