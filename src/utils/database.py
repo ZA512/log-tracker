@@ -569,10 +569,21 @@ class Database:
             self.connect()
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT id, timestamp, project_id, ticket_id, description, duration, ticket_title
-                FROM entries
-                WHERE is_synced = 0
-                ORDER BY timestamp DESC
+                SELECT 
+                    e.id, 
+                    e.timestamp, 
+                    e.project_id, 
+                    e.ticket_id, 
+                    e.description, 
+                    e.duration, 
+                    e.ticket_title,
+                    p.name as project_name,
+                    t.ticket_number as ticket_number
+                FROM entries e
+                LEFT JOIN projects p ON e.project_id = p.id
+                LEFT JOIN tickets t ON e.ticket_id = t.id
+                WHERE e.is_synced = 0
+                ORDER BY e.timestamp DESC
             """)
             columns = [col[0] for col in cursor.description]
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
