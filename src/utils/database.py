@@ -30,9 +30,17 @@ class Database:
     
     def create_tables(self):
         """Crée les tables si elles n'existent pas."""
-        self.connect()
         try:
+            self.connect()
             cursor = self.conn.cursor()
+            
+            # Table des paramètres
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
             
             # Table des projets
             cursor.execute("""
@@ -62,11 +70,23 @@ class Database:
                     project_id INTEGER,
                     ticket_id INTEGER,
                     duration INTEGER,
-                    sync_status INTEGER DEFAULT 0,
+                    ticket_title TEXT,
+                    is_synced INTEGER DEFAULT 0,
                     FOREIGN KEY (project_id) REFERENCES projects(id),
                     FOREIGN KEY (ticket_id) REFERENCES tickets(id)
                 )
             """)
+            
+            # Mise à jour des tables existantes pour ajouter les nouvelles colonnes
+            try:
+                cursor.execute("ALTER TABLE entries ADD COLUMN ticket_title TEXT")
+            except:
+                pass  # La colonne existe déjà
+                
+            try:
+                cursor.execute("ALTER TABLE entries ADD COLUMN is_synced INTEGER DEFAULT 0")
+            except:
+                pass  # La colonne existe déjà
             
             self.conn.commit()
         finally:
@@ -114,7 +134,7 @@ class Database:
         finally:
             self.disconnect()
     
-    def add_entry(self, description, project_id=None, ticket_id=None, duration=None):
+    def add_entry(self, description, project_id=None, ticket_id=None, duration=None, ticket_title=None):
         """
         Ajoute une entrée.
         
@@ -123,6 +143,7 @@ class Database:
             project_id: ID du projet (optionnel)
             ticket_id: ID du ticket (optionnel)
             duration: Durée en minutes (optionnel)
+            ticket_title: Titre du ticket (optionnel)
         """
         self.connect()
         try:
@@ -158,10 +179,10 @@ class Database:
             cursor.execute(
                 """
                 INSERT INTO entries 
-                (description, timestamp, project_id, ticket_id, duration)
-                VALUES (?, datetime('now', 'localtime'), ?, ?, ?)
+                (description, timestamp, project_id, ticket_id, duration, ticket_title)
+                VALUES (?, datetime('now', 'localtime'), ?, ?, ?, ?)
                 """,
-                (description, project_id, ticket_id, duration)
+                (description, project_id, ticket_id, duration, ticket_title)
             )
             self.conn.commit()
         finally:
@@ -441,5 +462,59 @@ class Database:
         except Exception as e:
             print(f"Erreur lors de la récupération des suggestions de tickets : {str(e)}")
             return []
+        finally:
+            self.disconnect()
+
+    def save_setting(self, key, value):
+        """Sauvegarde un paramètre."""
+        try:
+            self.connect()
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO settings (key, value)
+                VALUES (?, ?)
+            """, (key, value))
+            self.conn.commit()
+        finally:
+            self.disconnect()
+
+    def get_setting(self, key, default=None):
+        """Récupère un paramètre."""
+        try:
+            self.connect()
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            result = cursor.fetchone()
+            return result[0] if result else default
+        finally:
+            self.disconnect()
+
+    def get_unsynchronized_entries(self):
+        """Récupère les entrées non synchronisées."""
+        try:
+            self.connect()
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, timestamp, project_id, ticket_id, description, duration, ticket_title
+                FROM entries
+                WHERE is_synced = 0
+                ORDER BY timestamp DESC
+            """)
+            columns = [col[0] for col in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        finally:
+            self.disconnect()
+
+    def mark_entries_as_synced(self, entry_ids):
+        """Marque les entrées comme synchronisées."""
+        try:
+            self.connect()
+            cursor = self.conn.cursor()
+            cursor.executemany("""
+                UPDATE entries
+                SET is_synced = 1
+                WHERE id = ?
+            """, [(id,) for id in entry_ids])
+            self.conn.commit()
         finally:
             self.disconnect()

@@ -20,6 +20,7 @@ from utils.autocomplete import AutocompleteLineEdit
 from ui.ticket_combo import TicketComboBox
 from ui.project_combo import ProjectComboBox
 from ui.config_dialog import ConfigDialog
+from ui.sync_dialog import SyncDialog
 
 print("Starting application...")
 
@@ -420,6 +421,7 @@ class LogTrackerApp(QMainWindow):
         self.entry_dialog = None
         self.entries_dialog = None
         self.config_dialog = None
+        self.sync_dialog = None
         self.setup_ui()
         self.setup_timer()
         print("LogTrackerApp initialized")
@@ -493,11 +495,13 @@ class LogTrackerApp(QMainWindow):
         # Création des boutons avec les icônes colorées
         add_button = create_tool_button('plus.svg', "Nouvelle entrée", self.show_entry_dialog)
         list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
+        sync_button = create_tool_button('refresh.svg', "Synchroniser", self.show_sync_dialog)
         config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
 
         # Ajout des boutons à la barre d'outils
         toolbar.addWidget(add_button)
         toolbar.addWidget(list_button)
+        toolbar.addWidget(sync_button)
         toolbar.addStretch()
         toolbar.addWidget(config_button)
 
@@ -603,6 +607,12 @@ class LogTrackerApp(QMainWindow):
         if not self.config_dialog:
             self.config_dialog = ConfigDialog(self)
         self.config_dialog.show()
+    
+    def show_sync_dialog(self):
+        """Affiche la fenêtre de synchronisation."""
+        if not self.sync_dialog:
+            self.sync_dialog = SyncDialog(self)
+        self.sync_dialog.show()
 
     def check_last_entry(self):
         """Vérifie la dernière entrée et affiche une notification si nécessaire."""
