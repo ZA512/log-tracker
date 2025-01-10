@@ -1,23 +1,37 @@
 import requests
 from datetime import datetime
+import base64
 
 
 class JiraClient:
     """Client pour l'API Jira."""
     
-    def __init__(self, base_url, token):
+    def __init__(self, base_url, token, email):
         """Initialise le client Jira.
         
         Args:
-            base_url: URL de base de l'instance Jira (ex: https://your-domain.atlassian.net)
+            base_url: URL de base de l'instance Jira (ex: mycompany.atlassian.net)
             token: Token d'accès à l'API Jira
+            email: Email associé au compte Jira
         """
-        self.base_url = base_url.rstrip('/')
+        # Nettoie l'URL de base
+        base_url = base_url.strip().rstrip('/')
+        
+        # Si l'URL ne commence pas par http/https, on ajoute https://
+        if not base_url.startswith(('http://', 'https://')):
+            base_url = f'https://{base_url}'
+            
+        self.base_url = base_url
         self.headers = {
-            'Authorization': f'Bearer {token}',
+            'Authorization': f'Basic {self._encode_credentials(email, token)}',
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         }
+    
+    def _encode_credentials(self, email, token):
+        """Encode les identifiants en Base64 pour l'authentification Basic."""
+        credentials = f"{email}:{token}"
+        return base64.b64encode(credentials.encode()).decode()
     
     def get_issue_details(self, issue_key):
         """Récupère les détails d'un ticket.
@@ -30,18 +44,26 @@ class JiraClient:
         """
         try:
             response = requests.get(
-                f"{self.base_url}/rest/api/2/issue/{issue_key}",
+                f"{self.base_url}/rest/api/3/issue/{issue_key}",
                 headers=self.headers
             )
             response.raise_for_status()
             data = response.json()
+            
+            # Log pour le debug
+            print(f"Réponse Jira pour {issue_key}:", data)
+            
             return {
                 'key': data['key'],
                 'summary': data['fields']['summary'],
-                'description': data['fields']['description']
+                'description': data['fields'].get('description', '')
             }
         except Exception as e:
             print(f"Erreur lors de la récupération du ticket {issue_key}: {str(e)}")
+            if isinstance(e, requests.exceptions.RequestException):
+                print(f"URL: {e.response.url}")
+                print(f"Status code: {e.response.status_code}")
+                print(f"Response: {e.response.text}")
             return None
     
     def add_worklog(self, issue_key, time_spent_minutes, comment):

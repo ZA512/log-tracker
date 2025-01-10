@@ -56,6 +56,7 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     project_id INTEGER,
                     ticket_number TEXT NOT NULL,
+                    title TEXT,
                     FOREIGN KEY (project_id) REFERENCES projects(id),
                     UNIQUE(project_id, ticket_number)
                 )
@@ -82,11 +83,24 @@ class Database:
                 cursor.execute("ALTER TABLE entries ADD COLUMN ticket_title TEXT")
             except:
                 pass  # La colonne existe déjà
-                
+            
             try:
                 cursor.execute("ALTER TABLE entries ADD COLUMN is_synced INTEGER DEFAULT 0")
             except:
                 pass  # La colonne existe déjà
+            
+            try:
+                cursor.execute("ALTER TABLE tickets ADD COLUMN title TEXT")
+            except:
+                pass  # La colonne existe déjà
+            
+            # Ajout des paramètres par défaut
+            cursor.execute("""
+                INSERT OR IGNORE INTO settings (key, value) VALUES 
+                    ('jira_base_url', NULL),
+                    ('jira_token', NULL),
+                    ('jira_email', NULL);
+            """)
             
             self.conn.commit()
         finally:
@@ -111,13 +125,14 @@ class Database:
         finally:
             self.disconnect()
     
-    def add_ticket(self, project_id, ticket_number):
+    def add_ticket(self, project_id, ticket_number, title=None):
         """
         Ajoute un ticket.
         
         Args:
             project_id: ID du projet
             ticket_number: Numéro du ticket
+            title: Titre du ticket (optionnel)
             
         Returns:
             ID du ticket
@@ -125,12 +140,74 @@ class Database:
         self.connect()
         try:
             cursor = self.conn.cursor()
-            cursor.execute(
-                "INSERT INTO tickets (project_id, ticket_number) VALUES (?, ?)",
-                (project_id, ticket_number)
-            )
+            cursor.execute("""
+                INSERT INTO tickets (project_id, ticket_number, title)
+                VALUES (?, ?, ?)
+            """, (project_id, ticket_number, title))
             self.conn.commit()
             return cursor.lastrowid
+        finally:
+            self.disconnect()
+    
+    def update_ticket_title(self, ticket_id, title):
+        """
+        Met à jour le titre d'un ticket.
+        
+        Args:
+            ticket_id: ID du ticket
+            title: Nouveau titre du ticket
+        """
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE tickets SET title = ? WHERE id = ?", (title, ticket_id))
+            self.conn.commit()
+        finally:
+            self.disconnect()
+    
+    def get_ticket_info(self, project_id, ticket_number):
+        """
+        Récupère les informations d'un ticket.
+        
+        Args:
+            project_id: ID du projet
+            ticket_number: Numéro du ticket
+            
+        Returns:
+            Tuple contenant l'ID, le numéro et le titre du ticket
+        """
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, ticket_number, title
+                FROM tickets
+                WHERE project_id = ? AND ticket_number = ?
+            """, (project_id, ticket_number))
+            return cursor.fetchone()
+        finally:
+            self.disconnect()
+    
+    def get_tickets_for_project(self, project_id):
+        """
+        Récupère tous les tickets d'un projet avec leurs titres.
+        
+        Args:
+            project_id: ID du projet
+            
+        Returns:
+            Liste de tuples contenant l'ID, le numéro et le titre de chaque ticket
+        """
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, ticket_number, title
+                FROM tickets
+                WHERE project_id = ?
+                ORDER BY ticket_number DESC
+            """, (project_id,))
+            return cursor.fetchall()
         finally:
             self.disconnect()
     
@@ -161,29 +238,25 @@ class Database:
             
             # Si un ticket est spécifié, on le crée ou on le récupère
             if ticket_id and project_id and isinstance(ticket_id, str):
-                cursor.execute(
-                    "SELECT id FROM tickets WHERE project_id = ? AND ticket_number = ?",
-                    (project_id, ticket_id)
-                )
+                cursor.execute("""
+                    SELECT id FROM tickets WHERE project_id = ? AND ticket_number = ?
+                """, (project_id, ticket_id))
                 row = cursor.fetchone()
                 if row:
                     ticket_id = row[0]
                 else:
-                    cursor.execute(
-                        "INSERT INTO tickets (project_id, ticket_number) VALUES (?, ?)",
-                        (project_id, ticket_id)
-                    )
+                    cursor.execute("""
+                        INSERT INTO tickets (project_id, ticket_number)
+                        VALUES (?, ?)
+                    """, (project_id, ticket_id))
                     ticket_id = cursor.lastrowid
             
             # Ajoute l'entrée
-            cursor.execute(
-                """
+            cursor.execute("""
                 INSERT INTO entries 
                 (description, timestamp, project_id, ticket_id, duration, ticket_title)
                 VALUES (?, datetime('now', 'localtime'), ?, ?, ?, ?)
-                """,
-                (description, project_id, ticket_id, duration, ticket_title)
-            )
+            """, (description, project_id, ticket_id, duration, ticket_title))
             self.conn.commit()
         finally:
             self.disconnect()
@@ -310,7 +383,8 @@ class Database:
                 return {
                     'id': row[0],
                     'project_id': row[1],
-                    'ticket_number': row[2]
+                    'ticket_number': row[2],
+                    'title': row[3]
                 }
             return None
             
@@ -358,7 +432,7 @@ class Database:
         try:
             cursor = self.conn.cursor()
             query = """
-                SELECT e.*, p.name as project_name, t.ticket_number
+                SELECT e.*, p.name as project_name, t.ticket_number, t.title as ticket_title
                 FROM entries e
                 LEFT JOIN projects p ON e.project_id = p.id
                 LEFT JOIN tickets t ON e.ticket_id = t.id
@@ -385,7 +459,7 @@ class Database:
         try:
             cursor = self.conn.cursor()
             query = """
-                SELECT e.*, p.name as project_name, t.ticket_number,
+                SELECT e.*, p.name as project_name, t.ticket_number, t.title as ticket_title,
                        date(e.timestamp) as entry_date
                 FROM entries e
                 LEFT JOIN projects p ON e.project_id = p.id
