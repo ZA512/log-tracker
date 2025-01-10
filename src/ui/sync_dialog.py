@@ -10,26 +10,26 @@ from utils.jira_client import JiraClient
 
 class SyncDialog(QDialog):
     """Fenêtre de synchronisation avec Jira."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.db = Database()
         self.setup_ui()
         self.load_entries()
-    
+
     def setup_ui(self):
         """Configure l'interface utilisateur."""
         self.setWindowTitle("Synchronisation Jira")
         self.setModal(True)
         self.resize(1000, 600)
-        
+
         layout = QVBoxLayout()
-        
+
         # En-tête
         header_label = QLabel("Entrées à synchroniser avec Jira")
         header_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         layout.addWidget(header_label)
-        
+
         # Liste des entrées
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Date", "Projet", "Ticket", "Description", "Durée"])
@@ -40,77 +40,79 @@ class SyncDialog(QDialog):
         self.tree.setColumnWidth(4, 100)  # Durée
         self.tree.setAlternatingRowColors(True)
         layout.addWidget(self.tree)
-        
+
         # Barre de progression
         self.progress = QProgressBar()
         self.progress.hide()
         layout.addWidget(self.progress)
-        
+
         # Légende
         legend_label = QLabel("Les entrées sans ticket sont marquées en orange")
         legend_label.setStyleSheet("color: #FF8C00;")
         layout.addWidget(legend_label)
-        
+
         # Bouton de synchronisation
         self.sync_button = QPushButton("Synchroniser avec Jira")
         self.sync_button.clicked.connect(self.sync_with_jira)
         layout.addWidget(self.sync_button)
-        
+
         self.setLayout(layout)
-    
+
     def load_entries(self):
         """Charge les entrées non synchronisées."""
         self.tree.clear()
         entries = self.db.get_unsynchronized_entries()
-        
+
         for entry in entries:
             item = QTreeWidgetItem()
-            
+
             # Date et heure
             timestamp = QDateTime.fromString(entry['timestamp'], Qt.DateFormat.ISODate)
             item.setText(0, timestamp.toString("dd/MM/yyyy HH:mm"))
-            
+
             # Projet et ticket
             item.setText(1, entry.get('project_name', ''))
             ticket = entry.get('ticket_number', '')
             item.setText(2, ticket)
-            
+
             # Description (avec le titre du ticket si disponible)
             description = entry.get('description', '')
             if entry.get('ticket_title'):
                 description = f"{entry['ticket_title']}\n{description}"
             item.setText(3, description)
-            
+
             # Durée
             duration = entry.get('duration', 0)
-            item.setText(4, f"{duration}h")
-            
-            # Colore en orange les entrées sans ticket
+            item.setText(4, f"{duration} min")
+
+            # Colore en orange le texte des entrées sans ticket
             if not ticket:
+                orange_color = QColor(255, 140, 0)  # Orange foncé pour une meilleure lisibilité
                 for col in range(5):
-                    item.setBackground(col, QColor(255, 200, 100))
-            
+                    item.setForeground(col, orange_color)
+
             # Stocke l'ID pour la synchronisation
             item.setData(0, Qt.ItemDataRole.UserRole, entry['id'])
-            
+
             self.tree.addTopLevelItem(item)
-    
+
     def sync_with_jira(self):
         """Synchronise les entrées avec Jira."""
         # Vérifie la configuration Jira
-        jira_url = self.db.get_setting('jira_url')
-        jira_token = self.db.get_setting('jira_token')
+        base_url = self.db.get_setting('jira_base_url')
+        token = self.db.get_setting('jira_token')
+        email = self.db.get_setting('jira_email')
         
-        if not jira_url or not jira_token:
+        if not base_url or not token or not email:
             QMessageBox.warning(
                 self,
                 "Configuration manquante",
-                "Veuillez configurer l'URL et le token Jira dans les paramètres."
+                "Veuillez configurer l'URL, l'email et le token Jira dans les paramètres."
             )
             return
         
         # Initialise le client Jira
-        jira = JiraClient(jira_url, jira_token)
+        jira = JiraClient(base_url, token, email)
         
         # Prépare la synchronisation
         entries_count = self.tree.topLevelItemCount()
@@ -128,7 +130,7 @@ class SyncDialog(QDialog):
             entry_id = item.data(0, Qt.ItemDataRole.UserRole)
             ticket = item.text(2)
             description = item.text(3)
-            duration = float(item.text(4).rstrip('h'))
+            duration = float(item.text(4).rstrip(' min'))  # Convertit en minutes
             
             # Si pas de ticket, marque comme synchronisé et continue
             if not ticket:
@@ -137,7 +139,7 @@ class SyncDialog(QDialog):
                 continue
             
             # Tente d'ajouter le worklog
-            if jira.add_worklog(ticket, int(duration * 60), description):
+            if jira.add_worklog(ticket, int(duration), description):
                 synced_ids.append(entry_id)
             else:
                 errors.append(f"Erreur lors de la synchronisation du ticket {ticket}")
