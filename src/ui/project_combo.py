@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget, QCompleter
 from PyQt6.QtCore import Qt, pyqtSignal
 
 class ProjectComboBox(QWidget):
@@ -22,8 +22,14 @@ class ProjectComboBox(QWidget):
         self.combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.combo.currentTextChanged.connect(self._on_text_changed)
         self.combo.setMinimumWidth(200)  # Largeur minimale
-        layout.addWidget(self.combo)
         
+        # Configuration de l'autocomplétion
+        self.completer = QCompleter([])
+        self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.combo.setCompleter(self.completer)
+        
+        layout.addWidget(self.combo)
         self.setLayout(layout)
     
     def _on_text_changed(self, text):
@@ -40,26 +46,26 @@ class ProjectComboBox(QWidget):
         """
         self.projects = projects
         
-        # Sauvegarde le texte actuel
-        current_text = self.combo.currentText()
-        
-        # Met à jour la combobox
+        # Met à jour la combobox et le completer
         self.combo.clear()
         self.combo.addItems(projects)
+        self.completer.setModel(self.combo.model())
         
-        # Sélectionne le projet approprié
+        # Sélectionne le projet approprié si spécifié, sinon laisse vide
         if current_project is not None:
             index = self.combo.findText(current_project)
             if index >= 0:
                 self.combo.setCurrentIndex(index)
-        elif current_text in projects:
-            index = self.combo.findText(current_text)
-            if index >= 0:
-                self.combo.setCurrentIndex(index)
+        else:
+            self.combo.setCurrentText("")
     
     def clear(self):
         """Efface le contenu de la combobox."""
+        current_items = [self.combo.itemText(i) for i in range(self.combo.count())]
         self.combo.setCurrentText("")
+        # On garde les items pour l'autocomplétion
+        if current_items:
+            self.set_projects(current_items)
     
     def text(self):
         """Retourne le texte actuel."""
@@ -68,3 +74,9 @@ class ProjectComboBox(QWidget):
     def setText(self, text):
         """Définit le texte de la combobox."""
         self.combo.setCurrentText(text)
+    
+    def setFocus(self):
+        """Met le focus sur la combobox."""
+        self.combo.setFocus()
+        # Sélectionne tout le texte pour faciliter la saisie
+        self.combo.lineEdit().selectAll()
