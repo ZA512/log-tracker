@@ -38,6 +38,13 @@ class SyncDialog(QDialog):
         self.tree.setColumnWidth(2, 100)  # Ticket
         self.tree.setColumnWidth(3, 450)  # Description
         self.tree.setColumnWidth(4, 100)  # Durée
+        
+        # Configuration des couleurs
+        self.tree.setStyleSheet("""
+            QTreeWidget {
+                alternate-background-color: #2d4f6c;
+            }
+        """)
         self.tree.setAlternatingRowColors(True)
         layout.addWidget(self.tree)
 
@@ -67,7 +74,7 @@ class SyncDialog(QDialog):
             item = QTreeWidgetItem()
 
             # Date et heure
-            timestamp = QDateTime.fromString(entry['timestamp'], Qt.DateFormat.ISODate)
+            timestamp = QDateTime.fromString(f"{entry['date']} {entry['time']}", "yyyy-MM-dd HH:mm")
             item.setText(0, timestamp.toString("dd/MM/yyyy HH:mm"))
 
             # Projet et ticket
@@ -85,11 +92,19 @@ class SyncDialog(QDialog):
             duration = entry.get('duration', 0)
             item.setText(4, f"{duration} min")
 
-            # Colore en orange le texte des entrées sans ticket
+            # Application des couleurs
             if not ticket:
-                orange_color = QColor(255, 140, 0)  # Orange foncé pour une meilleure lisibilité
+                # Entrées sans ticket en orange (sauf durée)
+                orange_color = QColor("#FF8C00")
                 for col in range(5):
-                    item.setForeground(col, orange_color)
+                    if col != 4:  # On ne change pas la couleur de la durée
+                        item.setForeground(col, orange_color)
+            else:
+                # Ticket en bleu
+                item.setForeground(2, QColor("#64b5f6"))
+            
+            # Durée toujours en vert
+            item.setForeground(4, QColor("#81c784"))
 
             # Stocke l'ID pour la synchronisation
             item.setData(0, Qt.ItemDataRole.UserRole, entry['id'])

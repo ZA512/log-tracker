@@ -7,9 +7,10 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QTextEdit, QTreeWidget, QTreeWidgetItem,
     QFrame, QSpinBox, QComboBox, QRadioButton, QButtonGroup, QGroupBox,
-    QSplitter, QDialog, QFormLayout, QStyle, QToolButton, QDialogButtonBox, QMessageBox
+    QSplitter, QDialog, QFormLayout, QStyle, QToolButton, QDialogButtonBox, QMessageBox,
+    QDateEdit, QTimeEdit
 )
-from PyQt6.QtCore import Qt, QTimer, QSize
+from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime
 from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
 import os
 
@@ -36,7 +37,9 @@ class EntryDialog(QDialog):
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self.setup_ui()
         self.setup_suggestions()  # Initialise les suggestions
-        self.reset_fields()  # Réinitialise tous les champs
+        self.clear_all(init=True)  # Efface tout à l'initialisation
+        # Force le focus sur le projet
+        QTimer.singleShot(0, lambda: self.project_input.setFocus())
         print("EntryDialog initialized")
 
     def setup_jira_client(self):
@@ -59,48 +62,48 @@ class EntryDialog(QDialog):
     def setup_ui(self):
         """Configure l'interface utilisateur."""
         print("Setting up EntryDialog UI...")
-        self.setWindowTitle("Nouvelle entrée")
+        self.setWindowTitle("Ajouter une entrée")
         self.setModal(True)
-        self.resize(500, 400)
+        self.resize(400, 350)  # Un peu plus haut pour les boutons de raccourci
 
         main_layout = QVBoxLayout()
         form_layout = QFormLayout()
-        form_layout.setSpacing(5)  # Réduit l'espace entre les éléments
+
+        # Date et heure
+        date_time_layout = QHBoxLayout()
         
-        # Projet avec bouton X
-        project_widget = QWidget()
-        project_layout = QHBoxLayout(project_widget)
-        project_layout.setContentsMargins(0, 0, 0, 0)
-        project_layout.setSpacing(5)
+        self.date_input = QDateEdit()
+        self.date_input.setCalendarPopup(True)
+        self.date_input.setDate(QDate.currentDate())
         
+        self.time_input = QTimeEdit()
+        self.time_input.setTime(QTime.currentTime())
+        self.time_input.setDisplayFormat("HH:mm")
+        
+        date_time_layout.addWidget(self.date_input)
+        date_time_layout.addWidget(self.time_input)
+        form_layout.addRow("Date et heure:", date_time_layout)
+
+        # Projet
         self.project_input = ProjectComboBox()
         self.project_input.projectChanged.connect(self.on_project_changed)
-        clear_button = QPushButton("✕")
-        clear_button.setFixedWidth(30)
-        clear_button.clicked.connect(self.clear_project_ticket)
-        clear_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        
-        project_layout.addWidget(self.project_input)
-        project_layout.addWidget(clear_button)
-        
-        form_layout.addRow("Projet:", project_widget)
-        
+        form_layout.addRow("Projet:", self.project_input)
+
         # Ticket
         self.ticket_input = TicketComboBox()
         self.ticket_input.ticketChanged.connect(self.on_ticket_selected)
         form_layout.addRow("Ticket:", self.ticket_input)
-        
+
         # Titre du ticket
         self.ticket_title = QLineEdit()
         self.ticket_title.setPlaceholderText("Le titre sera récupéré automatiquement depuis Jira")
         self.ticket_title.focusInEvent = self.on_title_focus
         form_layout.addRow("Titre:", self.ticket_title)
-        
+
         # Description
         self.description_input = QTextEdit()
-        self.description_input.setMinimumHeight(100)
         form_layout.addRow("Description:", self.description_input)
-        
+
         # Durée avec label "minutes" à droite et boutons de raccourcis
         duration_widget = QWidget()
         duration_layout = QVBoxLayout(duration_widget)
@@ -113,13 +116,11 @@ class EntryDialog(QDialog):
         
         self.duration_input = QSpinBox()
         self.duration_input.setMinimum(1)
-        self.duration_input.setMaximum(999)
-        self.duration_input.setValue(60)  # Valeur par défaut : 60 minutes
-        
-        minutes_label = QLabel("minutes")
+        self.duration_input.setMaximum(480)  # 8 heures
+        self.duration_input.setValue(60)  # 1 heure par défaut
+        self.duration_input.setSuffix(" minutes")
         
         spinbox_layout.addWidget(self.duration_input)
-        spinbox_layout.addWidget(minutes_label)
         spinbox_layout.addStretch()
         
         duration_layout.addLayout(spinbox_layout)
@@ -133,6 +134,8 @@ class EntryDialog(QDialog):
             button = QPushButton(text)
             button.clicked.connect(lambda: self.duration_input.setValue(minutes))
             button.setFixedWidth(40)
+            button.setAutoDefault(False)  # Empêche le bouton d'être sélectionné par défaut
+            button.setDefault(False)      # Empêche le bouton d'être le bouton par défaut
             return button
         
         # Création des boutons de raccourcis
@@ -147,28 +150,44 @@ class EntryDialog(QDialog):
         
         duration_layout.addLayout(shortcuts_layout)
         form_layout.addRow("Durée:", duration_widget)
-        
+
         main_layout.addLayout(form_layout)
-        
-        # Boutons OK/Annuler
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        main_layout.addWidget(buttons)
-        
+
+        # Boutons
+        buttons_layout = QHBoxLayout()
+        save_button = QPushButton("Sauvegarder")
+        save_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("Annuler")
+        cancel_button.clicked.connect(self.reject)
+        clear_button = QPushButton("Effacer")
+        clear_button.clicked.connect(self.clear_all)
+        buttons_layout.addWidget(save_button)
+        buttons_layout.addWidget(cancel_button)
+        buttons_layout.addWidget(clear_button)
+
+        main_layout.addLayout(buttons_layout)
         self.setLayout(main_layout)
         print("EntryDialog UI set up")
 
-    def on_title_focus(self, event):
-        """Appelé lorsque le champ titre reçoit le focus."""
-        if not self.ticket_title.text().strip():  # Si le titre est vide
-            ticket_text = self.ticket_input.text()
-            if ticket_text:
-                self.fetch_ticket_title_from_jira(ticket_text)
-        # Appelle l'événement focusIn par défaut
-        QLineEdit.focusInEvent(self.ticket_title, event)
+    def clear_all(self, init=False):
+        """Efface tous les champs et remet les valeurs par défaut."""
+        # Remet la date et l'heure actuelles
+        self.date_input.setDate(QDate.currentDate())
+        self.time_input.setTime(QTime.currentTime())
+        
+        # Efface les autres champs
+        self.project_input.clear()
+        self.ticket_input.clear()
+        self.ticket_title.clear()
+        self.description_input.clear()
+        self.duration_input.setValue(60)
+        
+        # Recharge les projets pour l'autocomplétion seulement à l'initialisation
+        if init:
+            self.setup_suggestions()
+        
+        # Remet le focus sur le projet
+        self.project_input.setFocus()
 
     def setup_suggestions(self):
         """Initialise les suggestions pour les projets."""
@@ -177,12 +196,6 @@ class EntryDialog(QDialog):
             self.project_input.set_projects(projects)
         except Exception as e:
             print(f"Erreur lors de l'initialisation des suggestions : {str(e)}")
-
-    def clear_project_ticket(self):
-        """Efface les champs projet et ticket."""
-        self.project_input.clear()
-        self.ticket_input.clear()
-        self.ticket_title.clear()
 
     def on_project_changed(self, project_name):
         """Appelé lorsque le projet change."""
@@ -260,6 +273,15 @@ class EntryDialog(QDialog):
         except Exception as e:
             print(f"Erreur lors de la récupération du titre du ticket {ticket_number}: {str(e)}")
 
+    def on_title_focus(self, event):
+        """Appelé lorsque le champ titre reçoit le focus."""
+        if not self.ticket_title.text().strip():  # Si le titre est vide
+            ticket_text = self.ticket_input.text()
+            if ticket_text:
+                self.fetch_ticket_title_from_jira(ticket_text)
+        # Appelle l'événement focusIn par défaut
+        QLineEdit.focusInEvent(self.ticket_title, event)
+
     def accept(self):
         """Appelé lorsque l'utilisateur valide le dialogue."""
         project_name = self.project_input.text()
@@ -267,6 +289,8 @@ class EntryDialog(QDialog):
         description = self.description_input.toPlainText()
         duration = self.duration_input.value()
         ticket_title = self.ticket_title.text()
+        date = self.date_input.date().toString("yyyy-MM-dd")
+        time = self.time_input.time().toString("HH:mm")
 
         if not description:
             QMessageBox.warning(self, "Erreur", "La description est obligatoire.")
@@ -298,21 +322,15 @@ class EntryDialog(QDialog):
                 project_id=project_id,
                 ticket_id=ticket_id,
                 duration=duration,
-                ticket_title=ticket_title
+                ticket_title=ticket_title,
+                date=date,
+                time=time
             )
 
             super().accept()
 
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enregistrement : {str(e)}")
-
-    def reset_fields(self):
-        """Réinitialise tous les champs."""
-        self.project_input.clear()
-        self.ticket_input.clear()
-        self.ticket_title.clear()
-        self.description_input.clear()
-        self.duration_input.setValue(60)
 
 
 class EntriesDialog(QDialog):
@@ -370,12 +388,14 @@ class EntriesDialog(QDialog):
 
         # Configuration du QTreeWidget
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Projet", "Ticket", "Durée", "Description", ""])  # Colonne vide pour le retour à la ligne
+        self.tree.setHeaderLabels(["Projet", "Ticket", "Durée", "Description", "Date", "Heure", ""])  # Colonne vide pour le retour à la ligne
         self.tree.setColumnWidth(0, 150)  # Projet
         self.tree.setColumnWidth(1, 100)  # Ticket
         self.tree.setColumnWidth(2, 80)   # Durée
         self.tree.setColumnWidth(3, 400)  # Description
-        self.tree.setColumnWidth(4, 10)   # Colonne vide
+        self.tree.setColumnWidth(4, 100)  # Date
+        self.tree.setColumnWidth(5, 60)   # Heure
+        self.tree.setColumnWidth(6, 10)   # Colonne vide
         self.tree.setWordWrap(True)
         layout.addWidget(self.tree)
 
@@ -428,9 +448,21 @@ class EntriesDialog(QDialog):
                     for entry in project_entries:
                         entry_item = QTreeWidgetItem(project_item)
                         entry_item.setText(0, "")  # Projet déjà affiché dans le parent
-                        entry_item.setText(1, entry.get('ticket_number', ''))
-                        entry_item.setText(2, f"{entry.get('duration', 0)}m")
+                        
+                        # Ticket en bleu
+                        ticket = entry.get('ticket_number', '')
+                        entry_item.setText(1, ticket)
+                        if ticket:
+                            entry_item.setForeground(1, QColor("#64b5f6"))
+                        
+                        # Durée en vert
+                        duration = entry.get('duration', 0)
+                        entry_item.setText(2, f"{duration}m")
+                        entry_item.setForeground(2, QColor("#81c784"))
+                        
                         entry_item.setText(3, entry.get('description', ''))
+                        entry_item.setText(4, entry.get('date', ''))
+                        entry_item.setText(5, entry.get('time', ''))
 
                 self.tree.expandAll()
 
@@ -444,7 +476,7 @@ class EntriesDialog(QDialog):
                 # Organise les entrées par date
                 entries_by_date = {}
                 for entry in entries:
-                    entry_timestamp = datetime.fromisoformat(entry.get('timestamp'))
+                    entry_timestamp = datetime.strptime(f"{entry.get('date', '')} {entry.get('time', '')}", "%Y-%m-%d %H:%M")
                     entry_date = entry_timestamp.date()
                     if entry_date not in entries_by_date:
                         entries_by_date[entry_date] = []
@@ -471,12 +503,24 @@ class EntriesDialog(QDialog):
                     date_item.setText(2, f"{total_duration}m")
 
                     for entry in date_entries:
-                        entry_timestamp = datetime.fromisoformat(entry.get('timestamp'))
+                        entry_timestamp = datetime.strptime(f"{entry.get('date', '')} {entry.get('time', '')}", "%Y-%m-%d %H:%M")
                         entry_item = QTreeWidgetItem(date_item)
                         entry_item.setText(0, entry.get('project_name', ''))
-                        entry_item.setText(1, entry.get('ticket_number', ''))
-                        entry_item.setText(2, f"{entry.get('duration', 0)}m")
+                        
+                        # Ticket en bleu
+                        ticket = entry.get('ticket_number', '')
+                        entry_item.setText(1, ticket)
+                        if ticket:
+                            entry_item.setForeground(1, QColor("#64b5f6"))
+                        
+                        # Durée en vert
+                        duration = entry.get('duration', 0)
+                        entry_item.setText(2, f"{duration}m")
+                        entry_item.setForeground(2, QColor("#81c784"))
+                        
                         entry_item.setText(3, f"{entry_timestamp.strftime('%H:%M')} - {entry.get('description', '')}")
+                        entry_item.setText(4, entry.get('date', ''))
+                        entry_item.setText(5, entry.get('time', ''))
 
                 self.tree.expandAll()
 
@@ -493,12 +537,24 @@ class EntriesDialog(QDialog):
                     project_item.setText(2, f"{total_duration}m")
 
                     for entry in entries:
-                        entry_timestamp = datetime.fromisoformat(entry.get('timestamp'))
+                        entry_timestamp = datetime.strptime(f"{entry.get('date', '')} {entry.get('time', '')}", "%Y-%m-%d %H:%M")
                         entry_item = QTreeWidgetItem(project_item)
                         entry_item.setText(0, "")  # Projet déjà affiché dans le parent
-                        entry_item.setText(1, entry.get('ticket_number', ''))
-                        entry_item.setText(2, f"{entry.get('duration', 0)}m")
+                        
+                        # Ticket en bleu
+                        ticket = entry.get('ticket_number', '')
+                        entry_item.setText(1, ticket)
+                        if ticket:
+                            entry_item.setForeground(1, QColor("#64b5f6"))
+                        
+                        # Durée en vert
+                        duration = entry.get('duration', 0)
+                        entry_item.setText(2, f"{duration}m")
+                        entry_item.setForeground(2, QColor("#81c784"))
+                        
                         entry_item.setText(3, f"{entry_timestamp.strftime('%d/%m %H:%M')} - {entry.get('description', '')}")
+                        entry_item.setText(4, entry.get('date', ''))
+                        entry_item.setText(5, entry.get('time', ''))
 
                 self.tree.expandAll()
 
@@ -530,6 +586,7 @@ class LogTrackerApp(QMainWindow):
 
     def setup_ui(self):
         """Configure l'interface utilisateur."""
+        print("Setting up LogTrackerApp UI...")
         self.setWindowTitle("Log Tracker")
         self.resize(300, 100)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
@@ -571,7 +628,6 @@ class LogTrackerApp(QMainWindow):
 
         # Barre d'outils supérieure
         toolbar = QHBoxLayout()
-        toolbar.setSpacing(2)
 
         # Fonction pour créer un bouton avec une icône SVG colorée
         def create_tool_button(icon_name, tooltip, callback):
@@ -590,9 +646,9 @@ class LogTrackerApp(QMainWindow):
             return button
 
         # Création des boutons avec les icônes colorées
-        add_button = create_tool_button('plus.svg', "Nouvelle entrée", self.show_entry_dialog)
+        add_button = create_tool_button('plus.svg', "Ajouter une entrée", self.show_entry_dialog)
         list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
-        sync_button = create_tool_button('refresh.svg', "Synchroniser", self.show_sync_dialog)
+        sync_button = create_tool_button('refresh.svg', "Synchroniser vers jira", self.show_sync_dialog)
         config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
 
         # Ajout des boutons à la barre d'outils
@@ -622,6 +678,8 @@ class LogTrackerApp(QMainWindow):
         clock_icon.setPixmap(clock_pixmap)
         
         self.current_time_label = QLabel("00:00")
+        self.current_time_label.setToolTip("Temps depuis la dernière saisie")
+        clock_icon.setToolTip("Temps depuis la dernière saisie")
         current_time_layout.addWidget(clock_icon)
         current_time_layout.addWidget(self.current_time_label)
         
@@ -639,12 +697,35 @@ class LogTrackerApp(QMainWindow):
         total_icon.setPixmap(sigma_pixmap)
         
         self.total_time_label = QLabel("0h00")
+        self.total_time_label.setToolTip("Temps saisie sur la journée")
+        total_icon.setToolTip("Temps saisie sur la journée")
         total_time_layout.addWidget(total_icon)
         total_time_layout.addWidget(self.total_time_label)
         
+        # Temps non synchronisé avec icône refresh-off.svg
+        unsync_time_layout = QHBoxLayout()
+        unsync_time_layout.setSpacing(5)
+        
+        # Création de l'icône refresh-off colorée
+        unsync_icon = QLabel()
+        unsync_pixmap = self.load_svg_icon('refresh-off.svg').pixmap(QSize(14, 14))
+        painter = QPainter(unsync_pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(unsync_pixmap.rect(), QColor("#d0d0d1"))
+        painter.end()
+        unsync_icon.setPixmap(unsync_pixmap)
+        
+        self.unsync_time_label = QLabel("0h00")
+        self.unsync_time_label.setToolTip("Temps non encore synchronisé")
+        unsync_icon.setToolTip("Temps non encore synchronisé")
+        unsync_time_layout.addWidget(unsync_icon)
+        unsync_time_layout.addWidget(self.unsync_time_label)
+
         info_layout.addLayout(current_time_layout)
         info_layout.addWidget(QLabel(" | "))  # Séparateur vertical
         info_layout.addLayout(total_time_layout)
+        info_layout.addWidget(QLabel(" | "))  # Séparateur vertical
+        info_layout.addLayout(unsync_time_layout)
         info_layout.addStretch()
         
         main_layout.addLayout(info_layout)
@@ -663,21 +744,38 @@ class LogTrackerApp(QMainWindow):
             # Récupère les entrées du jour
             today = datetime.now().date()
             entries = self.db.get_entries_for_day(today)
+            
+            # Calcule le temps total
+            total_minutes = sum(entry['duration'] or 0 for entry in entries)
+            hours = total_minutes // 60
+            minutes = total_minutes % 60
+            if hours > 0:
+                self.total_time_label.setText(f"{hours}h{minutes:02d}")
+            else:
+                self.total_time_label.setText(f"{minutes}m")
+            
+            # Calcule le temps non synchronisé
+            unsync_entries = self.db.get_unsynchronized_entries()
+            unsync_minutes = sum(entry['duration'] or 0 for entry in unsync_entries)
+            unsync_hours = unsync_minutes // 60
+            unsync_mins = unsync_minutes % 60
+            if unsync_hours > 0:
+                self.unsync_time_label.setText(f"{unsync_hours}h{unsync_mins:02d}")
+            else:
+                self.unsync_time_label.setText(f"{unsync_mins}m")
 
-            # Calcul du temps total
-            total_time = sum(entry['duration'] or 0 for entry in entries)
-            hours = total_time // 60
-            minutes = total_time % 60
-            self.total_time_label.setText(f"{hours}h{minutes:02d}")
-
-            # Mise à jour du temps actuel
+            # Met à jour le temps écoulé depuis la dernière entrée
             if entries:
                 last_entry = entries[0]  # Dernière entrée
-                last_time = datetime.fromisoformat(last_entry['timestamp'])
+                last_time = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
                 elapsed_minutes = int((datetime.now() - last_time).total_seconds() / 60)
                 hours = elapsed_minutes // 60
                 minutes = elapsed_minutes % 60
-                self.current_time_label.setText(f"{hours:02d}:{minutes:02d}")
+                
+                if hours > 0:
+                    self.current_time_label.setText(f"{hours}h{minutes:02d}")
+                else:
+                    self.current_time_label.setText(f"{minutes}m")
             else:
                 self.current_time_label.setText("00:00")
         except Exception as e:
@@ -686,8 +784,8 @@ class LogTrackerApp(QMainWindow):
     def show_entry_dialog(self):
         """Affiche la fenêtre de saisie."""
         print("Showing entry dialog...")
-        if self.entry_dialog is None:
-            self.entry_dialog = EntryDialog(self, self.db)
+        # Crée une nouvelle instance à chaque fois
+        self.entry_dialog = EntryDialog(self, self.db)
 
         if self.entry_dialog.exec() == QDialog.DialogCode.Accepted:
             self.update_summary()
@@ -724,7 +822,7 @@ class LogTrackerApp(QMainWindow):
                 return
 
             last_entry = entries[0]
-            last_time = datetime.fromisoformat(last_entry['timestamp'])
+            last_time = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
 
             if datetime.now() - last_time > timedelta(minutes=30):
                 # TODO: Implémenter les notifications système
