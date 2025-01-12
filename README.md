@@ -44,6 +44,45 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Installation des Exécutables
+
+### Windows
+1. Téléchargez `LogTracker-Windows.exe` depuis la [page des releases](https://github.com/ZA512/log-tracker/releases)
+2. Double-cliquez sur l'exécutable pour lancer l'application
+
+### macOS
+1. Téléchargez `LogTracker-Mac.app` depuis la [page des releases](https://github.com/ZA512/log-tracker/releases)
+2. Déplacez l'application dans votre dossier Applications
+3. Double-cliquez sur l'application pour la lancer
+
+Note : Lors du premier lancement sur macOS, vous devrez peut-être autoriser l'application dans Préférences Système > Sécurité et confidentialité.
+
+## Création des Exécutables (pour les développeurs)
+
+### Prérequis
+- Python 3.8 ou supérieur
+- Les dépendances du projet installées (`pip install -r requirements.txt`)
+
+### Windows
+```bash
+# Activation de l'environnement virtuel
+.\venv\Scripts\activate
+
+# Création de l'exécutable
+pyinstaller logtracker.spec
+```
+L'exécutable sera créé dans le dossier `dist/LogTracker.exe`
+
+### macOS
+```bash
+# Activation de l'environnement virtuel
+source venv/bin/activate
+
+# Création de l'exécutable
+pyinstaller logtracker.spec
+```
+L'application sera créée dans le dossier `dist/LogTracker.app`
+
 ## Structure du Projet
 
 ```
