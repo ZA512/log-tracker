@@ -561,8 +561,30 @@ class LogTrackerApp(QMainWindow):
 
     def load_svg_icon(self, filename):
         """Charge une icône SVG depuis le dossier resources."""
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'resources', filename)
-        return QIcon(path)
+        try:
+            # Déterminer le chemin de base en fonction du contexte (exe ou développement)
+            if getattr(sys, 'frozen', False):
+                # Si nous sommes dans l'exe
+                base_path = sys._MEIPASS
+                resources_dir = 'resources'
+            else:
+                # Si nous sommes en développement
+                base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                resources_dir = os.path.join('src', 'resources')
+
+            # Construire le chemin complet vers l'icône
+            icon_path = os.path.join(base_path, resources_dir, filename)
+            
+            # Vérifier si le fichier existe
+            if not os.path.exists(icon_path):
+                print(f"Icône non trouvée : {icon_path}")
+                return QIcon()
+    
+            # Charger et retourner l'icône
+            return QIcon(icon_path)
+        except Exception as e:
+            print(f"Erreur lors du chargement de l'icône {filename}: {str(e)}")
+            return QIcon()
 
     def setup_ui(self):
         """Configure l'interface utilisateur."""
