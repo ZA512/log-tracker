@@ -1,6 +1,6 @@
 # LogTracker
 
-LogTracker est une application de gestion et d'analyse de logs avancée. Elle permet de suivre, analyser et gérer efficacement les logs de différentes sources.
+LogTracker est une application simple pour journaliser ses activités quotidiennes et faire le lien avec ses tickets Jira.
 
 ## Installation
 
