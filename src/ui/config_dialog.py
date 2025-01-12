@@ -87,7 +87,7 @@ class ConfigDialog(QDialog):
                     if expiry_date.isValid():
                         self.token_expiry_input.setDate(expiry_date)
         except Exception as e:
-            print(f"Erreur lors du chargement de la configuration : {e}")
+            QMessageBox.critical(self, "Erreur", f"Erreur lors du chargement de la configuration : {str(e)}")
 
         self.jira_url_input.setText(self.db.get_setting('jira_base_url', ''))
         self.jira_email_input.setText(self.db.get_setting('jira_email', ''))

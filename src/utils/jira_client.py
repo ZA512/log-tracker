@@ -50,20 +50,16 @@ class JiraClient:
             response.raise_for_status()
             data = response.json()
             
-            # Log pour le debug
-            print(f"Réponse Jira pour {issue_key}:", data)
-            
             return {
                 'key': data['key'],
                 'summary': data['fields']['summary'],
                 'description': data['fields'].get('description', '')
             }
         except Exception as e:
-            print(f"Erreur lors de la récupération du ticket {issue_key}: {str(e)}")
             if isinstance(e, requests.exceptions.RequestException):
-                print(f"URL: {e.response.url}")
-                print(f"Status code: {e.response.status_code}")
-                print(f"Response: {e.response.text}")
+                print(f"Erreur API Jira pour {issue_key} - Status: {e.response.status_code}, Response: {e.response.text}")
+            else:
+                print(f"Erreur lors de la récupération du ticket {issue_key}: {str(e)}")
             return None
     
     def add_worklog(self, issue_key, time_spent_minutes, comment):

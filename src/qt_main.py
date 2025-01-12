@@ -14,22 +14,17 @@ from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime
 from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
 import os
 
-print("Importing database...")
 from utils.database import Database
-print("Importing autocomplete...")
 from utils.autocomplete import AutocompleteLineEdit
 from ui.ticket_combo import TicketComboBox
 from ui.project_combo import ProjectComboBox
 from ui.config_dialog import ConfigDialog
 from ui.sync_dialog import SyncDialog
 
-print("Starting application...")
-
 class EntryDialog(QDialog):
     """Fenêtre de saisie d'une nouvelle entrée."""
 
     def __init__(self, parent=None, db=None):
-        print("Initializing EntryDialog...")
         super().__init__(parent)
         self.db = db
         self.jira_client = None
@@ -40,7 +35,6 @@ class EntryDialog(QDialog):
         self.clear_all(init=True)  # Efface tout à l'initialisation
         # Force le focus sur le projet
         QTimer.singleShot(0, lambda: self.project_input.setFocus())
-        print("EntryDialog initialized")
 
     def setup_jira_client(self):
         """Configure le client Jira avec les paramètres de la base de données."""
@@ -48,12 +42,10 @@ class EntryDialog(QDialog):
             base_url = self.db.get_setting('jira_base_url')
             token = self.db.get_setting('jira_token')
             email = self.db.get_setting('jira_email')
-            print(f"Configuration Jira - URL: {base_url}, Email: {email}, Token présent: {'oui' if token else 'non'}")
             
             if base_url and token and email:
                 from utils.jira_client import JiraClient
                 self.jira_client = JiraClient(base_url, token, email)
-                print("Client Jira configuré avec succès")
             else:
                 print("Configuration Jira incomplète - URL, email ou token manquant")
         except Exception as e:
@@ -61,7 +53,6 @@ class EntryDialog(QDialog):
 
     def setup_ui(self):
         """Configure l'interface utilisateur."""
-        print("Setting up EntryDialog UI...")
         self.setWindowTitle("Ajouter une entrée")
         self.setModal(True)
         self.resize(400, 350)  # Un peu plus haut pour les boutons de raccourci
@@ -167,7 +158,6 @@ class EntryDialog(QDialog):
 
         main_layout.addLayout(buttons_layout)
         self.setLayout(main_layout)
-        print("EntryDialog UI set up")
 
     def clear_all(self, init=False):
         """Efface tous les champs et remet les valeurs par défaut."""
@@ -337,17 +327,14 @@ class EntriesDialog(QDialog):
     """Fenêtre d'affichage des entrées."""
 
     def __init__(self, parent=None, db=None):
-        print("Initializing EntriesDialog...")
         super().__init__(parent)
         self.db = db
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self.setup_ui()
         self.update_entries_view()
-        print("EntriesDialog initialized")
 
     def setup_ui(self):
         """Configure l'interface utilisateur."""
-        print("Setting up EntriesDialog UI...")
         self.setWindowTitle("Entrées")
         self.resize(800, 500)
 
@@ -400,7 +387,6 @@ class EntriesDialog(QDialog):
         layout.addWidget(self.tree)
 
         self.setLayout(layout)
-        print("EntriesDialog UI set up")
 
         # Connexion des signaux
         self.period_day.toggled.connect(self.update_entries_view)
@@ -410,7 +396,6 @@ class EntriesDialog(QDialog):
 
     def update_entries_view(self):
         """Met à jour l'affichage des entrées."""
-        print("Updating entries view...")
         self.tree.clear()
 
         # Calcul de la période
@@ -427,7 +412,6 @@ class EntriesDialog(QDialog):
                 # Vue journée groupée par projet
                 entries = self.db.get_entries_by_date_range(start_date, end_date)
                 if not entries:
-                    print("No entries for today")
                     return
 
                 # Organise les entrées par projet
@@ -470,7 +454,6 @@ class EntriesDialog(QDialog):
                 # Vue sur 8 jours chronologique
                 entries = self.db.get_entries_by_date_range(start_date, end_date)
                 if not entries:
-                    print("No entries for the last 8 days")
                     return
 
                 # Organise les entrées par date
@@ -527,7 +510,6 @@ class EntriesDialog(QDialog):
             else:  # Vue par projet sur 8 jours
                 entries_by_project = self.db.get_entries_by_project(start_date, end_date)
                 if not entries_by_project:
-                    print("No entries for the last 8 days")
                     return
 
                 for project_name, entries in entries_by_project.items():
@@ -568,7 +550,6 @@ class LogTrackerApp(QMainWindow):
     """Fenêtre principale de l'application."""
 
     def __init__(self):
-        print("Initializing LogTrackerApp...")
         super().__init__()
         self.db = Database()
         self.entry_dialog = None
@@ -577,7 +558,6 @@ class LogTrackerApp(QMainWindow):
         self.sync_dialog = None
         self.setup_ui()
         self.setup_timer()
-        print("LogTrackerApp initialized")
 
     def load_svg_icon(self, filename):
         """Charge une icône SVG depuis le dossier resources."""
@@ -586,7 +566,6 @@ class LogTrackerApp(QMainWindow):
 
     def setup_ui(self):
         """Configure l'interface utilisateur."""
-        print("Setting up LogTrackerApp UI...")
         self.setWindowTitle("Log Tracker")
         self.resize(300, 100)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
@@ -783,7 +762,6 @@ class LogTrackerApp(QMainWindow):
 
     def show_entry_dialog(self):
         """Affiche la fenêtre de saisie."""
-        print("Showing entry dialog...")
         # Crée une nouvelle instance à chaque fois
         self.entry_dialog = EntryDialog(self, self.db)
 
@@ -792,7 +770,6 @@ class LogTrackerApp(QMainWindow):
 
     def show_entries_dialog(self):
         """Affiche la fenêtre des entrées."""
-        print("Showing entries dialog...")
         if self.entries_dialog is None:
             self.entries_dialog = EntriesDialog(self, self.db)
         self.entries_dialog.show()
@@ -811,14 +788,12 @@ class LogTrackerApp(QMainWindow):
 
     def check_last_entry(self):
         """Vérifie la dernière entrée et affiche une notification si nécessaire."""
-        print("Checking last entry...")
         try:
             today = datetime.now().date()
             entries = self.db.get_entries_for_day(today)
 
             if not entries:
                 # TODO: Implémenter les notifications système
-                print("Pensez à saisir vos activités !")
                 return
 
             last_entry = entries[0]
@@ -826,7 +801,7 @@ class LogTrackerApp(QMainWindow):
 
             if datetime.now() - last_time > timedelta(minutes=30):
                 # TODO: Implémenter les notifications système
-                print("Pensez à saisir vos activités !")
+                return
 
         except Exception as e:
             print(f"Erreur lors de la vérification de la dernière entrée : {str(e)}")
@@ -834,15 +809,10 @@ class LogTrackerApp(QMainWindow):
 
 def main():
     """Point d'entrée de l'application."""
-    print("Creating QApplication...")
     app = QApplication(sys.argv)
-    print("Creating main window...")
     window = LogTrackerApp()
-    print("Showing main window...")
     window.show()
-    print("Starting event loop...")
     sys.exit(app.exec())
 
 if __name__ == '__main__':
-    print("Starting main()...")
     main()
