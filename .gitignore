@@ -34,6 +34,7 @@ wheels/
 
 # Logs
 *.log
+RELEASE_INSTRUCTIONS.md
 
 # Database
 *.db
