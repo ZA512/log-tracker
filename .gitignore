@@ -40,3 +40,7 @@ wheels/
 *.sqlite
 *.sqlite3
 *.db3
+
+# test
+*.test
+*.tests
