@@ -45,3 +45,5 @@ RELEASE_INSTRUCTIONS.md
 # test
 *.test
 *.tests
+
+src/config.json
