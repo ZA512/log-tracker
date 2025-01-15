@@ -792,9 +792,11 @@ class LogTrackerApp(QMainWindow):
 
     def show_entries_dialog(self):
         """Affiche la fenêtre des entrées."""
-        if self.entries_dialog is None:
+        if not self.entries_dialog:
             self.entries_dialog = EntriesDialog(self, self.db)
+        self.entries_dialog.update_entries_view()  # Rafraîchit à chaque ouverture
         self.entries_dialog.show()
+        self.entries_dialog.raise_()
 
     def show_config_dialog(self):
         """Affiche la fenêtre de configuration."""
@@ -806,7 +808,9 @@ class LogTrackerApp(QMainWindow):
         """Affiche la fenêtre de synchronisation."""
         if not self.sync_dialog:
             self.sync_dialog = SyncDialog(self)
+        self.sync_dialog.load_entries()  # Rafraîchit à chaque ouverture
         self.sync_dialog.show()
+        self.sync_dialog.raise_()
 
     def check_last_entry(self):
         """Vérifie la dernière entrée et affiche une notification si nécessaire."""
