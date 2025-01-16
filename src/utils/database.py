@@ -558,3 +558,14 @@ class Database:
             return [row[0] for row in cursor.fetchall()]
         finally:
             self.disconnect()
+            
+    def get_entry_by_id(self, entry_id):
+        """Récupère une entrée par son ID."""
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM entries WHERE id = ?", (entry_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            self.disconnect()

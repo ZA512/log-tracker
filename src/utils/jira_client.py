@@ -62,13 +62,14 @@ class JiraClient:
                 print(f"Erreur lors de la récupération du ticket {issue_key}: {str(e)}")
             return None
     
-    def add_worklog(self, issue_key, time_spent_minutes, comment):
+    def add_worklog(self, issue_key, time_spent_minutes, comment, started_datetime=None):
         """Ajoute un temps passé sur un ticket.
         
         Args:
             issue_key: Identifiant du ticket (ex: PROJ-123)
             time_spent_minutes: Temps passé en minutes
             comment: Commentaire à ajouter
+            started_datetime: Date et heure de début du travail (datetime)
             
         Returns:
             bool: True si succès, False si erreur
@@ -84,10 +85,14 @@ class JiraClient:
                 time_spent += f" {minutes}m"
             time_spent = time_spent.strip()
             
+            # Utilise la date fournie ou la date actuelle
+            if started_datetime is None:
+                started_datetime = datetime.now()
+            
             data = {
                 'timeSpent': time_spent,
                 'comment': comment,
-                'started': datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000+0100')
+                'started': started_datetime.strftime('%Y-%m-%dT%H:%M:%S.000+0100')
             }
             
             response = requests.post(

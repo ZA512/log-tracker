@@ -158,6 +158,10 @@ class SyncDialog(QDialog):
             description = item.text(3)
             duration = float(item.text(4).rstrip(' min'))  # Convertit en minutes
             
+            # Récupère la date et l'heure de l'entrée depuis la base de données
+            entry = self.db.get_entry_by_id(entry_id)
+            entry_datetime = QDateTime.fromString(f"{entry['date']} {entry['time']}", "yyyy-MM-dd HH:mm").toPyDateTime()
+            
             # Si pas de ticket, marque comme synchronisé et continue
             if not ticket:
                 synced_ids.append(entry_id)
@@ -165,7 +169,7 @@ class SyncDialog(QDialog):
                 continue
             
             # Tente d'ajouter le worklog
-            if jira.add_worklog(ticket, int(duration), description):
+            if jira.add_worklog(ticket, int(duration), description, entry_datetime):
                 synced_ids.append(entry_id)
             else:
                 errors.append(f"Erreur lors de la synchronisation du ticket {ticket}")
