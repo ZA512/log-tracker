@@ -84,7 +84,8 @@ class Database:
                 INSERT OR IGNORE INTO settings (key, value) VALUES 
                     ('jira_base_url', NULL),
                     ('jira_token', NULL),
-                    ('jira_email', NULL)
+                    ('jira_email', NULL),
+                    ('daily_hours', '8')
             """)
 
             self.conn.commit()
@@ -546,16 +547,15 @@ class Database:
         self.connect()
         try:
             cursor = self.conn.cursor()
-            query = """
-                SELECT DISTINCT t.ticket_number, MAX(e.date) as last_used_date, MAX(e.time) as last_used_time
+            cursor.execute("""
+                SELECT DISTINCT t.ticket_number, t.title
                 FROM tickets t
                 LEFT JOIN entries e ON e.ticket_id = t.id
                 WHERE t.project_id = ?
                 GROUP BY t.ticket_number
-                ORDER BY last_used_date DESC, last_used_time DESC NULLS LAST
-            """
-            cursor.execute(query, (project_id,))
-            return [row[0] for row in cursor.fetchall()]
+                ORDER BY MAX(e.date || ' ' || e.time) DESC NULLS LAST
+            """, (project_id,))
+            return [{'ticket_number': row['ticket_number'], 'title': row['title']} for row in cursor.fetchall()]
         finally:
             self.disconnect()
             
