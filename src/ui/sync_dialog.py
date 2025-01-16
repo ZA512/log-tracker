@@ -39,10 +39,15 @@ class SyncDialog(QDialog):
         self.tree.setColumnWidth(3, 450)  # Description
         self.tree.setColumnWidth(4, 100)  # Durée
         
-        # Configuration des couleurs
+        # Configuration des couleurs et de l'alignement
         self.tree.setStyleSheet("""
             QTreeWidget {
                 alternate-background-color: #2d4f6c;
+            }
+            QTreeWidget::item {
+                padding-top: 0;
+                padding-bottom: 0;
+                alignment: top;
             }
         """)
         self.tree.setAlternatingRowColors(True)
@@ -76,21 +81,27 @@ class SyncDialog(QDialog):
             # Date et heure
             timestamp = QDateTime.fromString(f"{entry['date']} {entry['time']}", "yyyy-MM-dd HH:mm")
             item.setText(0, timestamp.toString("dd/MM/yyyy HH:mm"))
+            item.setTextAlignment(0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
             # Projet et ticket
             item.setText(1, entry.get('project_name', ''))
+            item.setTextAlignment(1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            
             ticket = entry.get('ticket_number', '')
             item.setText(2, ticket)
+            item.setTextAlignment(2, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
             # Description (avec le titre du ticket si disponible)
             description = entry.get('description', '')
             if entry.get('ticket_title'):
                 description = f"{entry['ticket_title']}\n{description}"
             item.setText(3, description)
+            item.setTextAlignment(3, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
             # Durée
             duration = entry.get('duration', 0)
             item.setText(4, f"{duration} min")
+            item.setTextAlignment(4, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
             # Application des couleurs
             if not ticket:

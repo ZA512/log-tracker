@@ -448,6 +448,9 @@ class EntriesDialog(QDialog):
                         entry_item.setText(4, entry.get('date', ''))
                         entry_item.setText(5, entry.get('time', ''))
 
+                        for col in range(7):
+                            entry_item.setTextAlignment(col, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
                 self.tree.expandAll()
 
             elif self.view_by_day.isChecked():
@@ -505,6 +508,9 @@ class EntriesDialog(QDialog):
                         entry_item.setText(4, entry.get('date', ''))
                         entry_item.setText(5, entry.get('time', ''))
 
+                        for col in range(7):
+                            entry_item.setTextAlignment(col, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
                 self.tree.expandAll()
 
             else:  # Vue par projet sur 8 jours
@@ -537,6 +543,9 @@ class EntriesDialog(QDialog):
                         entry_item.setText(3, f"{entry_timestamp.strftime('%d/%m %H:%M')} - {entry.get('description', '')}")
                         entry_item.setText(4, entry.get('date', ''))
                         entry_item.setText(5, entry.get('time', ''))
+
+                        for col in range(7):
+                            entry_item.setTextAlignment(col, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
                 self.tree.expandAll()
 
