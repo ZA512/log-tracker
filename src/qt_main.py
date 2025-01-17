@@ -545,7 +545,7 @@ class EntriesDialog(QDialog):
                         entry_item.setText(2, f"{duration}m")
                         entry_item.setForeground(2, QColor("#81c784"))
                         
-                        entry_item.setText(3, f"{entry_timestamp.strftime('%H:%M')} - {entry.get('description', '')}")
+                        entry_item.setText(3, entry.get('description', ''))
                         entry_item.setText(4, entry.get('date', ''))
                         entry_item.setText(5, entry.get('time', ''))
 
@@ -581,7 +581,7 @@ class EntriesDialog(QDialog):
                         entry_item.setText(2, f"{duration}m")
                         entry_item.setForeground(2, QColor("#81c784"))
                         
-                        entry_item.setText(3, f"{entry_timestamp.strftime('%d/%m %H:%M')} - {entry.get('description', '')}")
+                        entry_item.setText(3, entry.get('description', ''))
                         entry_item.setText(4, entry.get('date', ''))
                         entry_item.setText(5, entry.get('time', ''))
 
