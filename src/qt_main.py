@@ -51,6 +51,35 @@ class EntryDialog(QDialog):
         except Exception as e:
             print(f"Erreur lors de la configuration du client Jira : {str(e)}")
 
+    def update_remaining_time(self, info_button):
+        """Met à jour le tooltip avec le temps restant à saisir."""
+        try:
+            # Récupère le nombre d'heures par jour depuis les paramètres
+            daily_hours = int(self.db.get_setting('daily_hours', '8'))
+            total_minutes = daily_hours * 60
+            
+            # Récupère la date sélectionnée
+            selected_date = self.date_input.date().toString('yyyy-MM-dd')
+            
+            # Calcule le temps déjà saisi
+            used_minutes = self.db.get_total_minutes_for_day(selected_date)
+            
+            # Calcule le temps restant
+            remaining_minutes = total_minutes - used_minutes
+            
+            # Formate le message
+            if remaining_minutes > 0:
+                message = f"Temps restant à placer sur la journée : {remaining_minutes} minutes"
+            else:
+                surplus = abs(remaining_minutes)
+                message = f"Dépassement du temps journalier de {surplus} minutes"
+            
+            # Met à jour le tooltip
+            info_button.setToolTip(message)
+            
+        except Exception as e:
+            info_button.setToolTip(f"Erreur lors du calcul du temps restant : {str(e)}")
+
     def setup_ui(self):
         """Configure l'interface utilisateur."""
         self.setWindowTitle("Ajouter une entrée")
@@ -112,9 +141,21 @@ class EntryDialog(QDialog):
         self.duration_input.setSuffix(" minutes")
         
         spinbox_layout.addWidget(self.duration_input)
+
+        # Icône d'information pour le temps restant
+        info_button = QToolButton()
+        info_button.setIcon(QIcon("src/resources/info.svg"))
+        info_button.setToolTip("Chargement...")  # Tooltip initial
+        spinbox_layout.addWidget(info_button)
+
         spinbox_layout.addStretch()
         
         duration_layout.addLayout(spinbox_layout)
+        # Mise à jour du tooltip quand la date change
+        self.date_input.dateChanged.connect(lambda: self.update_remaining_time(info_button))
+        
+        # Mise à jour initiale du tooltip
+        QTimer.singleShot(0, lambda: self.update_remaining_time(info_button))
         
         # Ligne avec les boutons de raccourcis
         shortcuts_layout = QHBoxLayout()
