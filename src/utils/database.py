@@ -569,3 +569,26 @@ class Database:
             return dict(row) if row else None
         finally:
             self.disconnect()
+
+    def get_total_minutes_for_day(self, date):
+        """
+        Calcule le total des minutes saisies pour une journée donnée.
+        
+        Args:
+            date: Date pour laquelle calculer le total (format 'YYYY-MM-DD')
+            
+        Returns:
+            Total des minutes saisies
+        """
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT SUM(duration) as total_minutes
+                FROM entries
+                WHERE date = ?
+            """, (date,))
+            result = cursor.fetchone()
+            return result['total_minutes'] or 0
+        finally:
+            self.disconnect()
