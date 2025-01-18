@@ -90,6 +90,12 @@ class EntriesDialog(QDialog):
         self.view_by_day.toggled.connect(self.update_entries_view)
         self.view_by_project.toggled.connect(self.update_entries_view)
 
+    def minutes_to_hhmm(self, minutes):
+        """Convertit une durée en minutes en format hh:mm."""
+        hours = minutes // 60
+        remaining_minutes = minutes % 60
+        return f"{hours:02d}h{remaining_minutes:02d}"
+
     def update_entries_view(self):
         """Met à jour l'affichage des entrées."""
         self.tree.clear()
@@ -123,7 +129,7 @@ class EntriesDialog(QDialog):
                     project_item = QTreeWidgetItem(self.tree)
                     project_item.setText(0, project)
                     total_duration = sum(entry.get('duration', 0) for entry in project_entries)
-                    project_item.setText(2, f"{total_duration}m")
+                    project_item.setText(2, self.minutes_to_hhmm(total_duration))
 
                     for entry in project_entries:
                         entry_item = QTreeWidgetItem(project_item)
@@ -137,7 +143,7 @@ class EntriesDialog(QDialog):
                         
                         # Durée en vert
                         duration = entry.get('duration', 0)
-                        entry_item.setText(2, f"{duration}m")
+                        entry_item.setText(2, self.minutes_to_hhmm(duration))
                         entry_item.setForeground(2, QColor("#81c784"))
                         
                         entry_item.setText(3, entry.get('description', ''))
@@ -182,7 +188,7 @@ class EntriesDialog(QDialog):
                     date_item = QTreeWidgetItem(self.tree)
                     date_item.setText(0, f"{jour} {date.strftime('%d/%m/%Y')}")
                     total_duration = sum(entry.get('duration', 0) for entry in date_entries)
-                    date_item.setText(2, f"{total_duration}m")
+                    date_item.setText(2, self.minutes_to_hhmm(total_duration))
 
                     for entry in date_entries:
                         entry_timestamp = datetime.strptime(f"{entry.get('date', '')} {entry.get('time', '')}", "%Y-%m-%d %H:%M")
@@ -197,7 +203,7 @@ class EntriesDialog(QDialog):
                         
                         # Durée en vert
                         duration = entry.get('duration', 0)
-                        entry_item.setText(2, f"{duration}m")
+                        entry_item.setText(2, self.minutes_to_hhmm(duration))
                         entry_item.setForeground(2, QColor("#81c784"))
                         
                         entry_item.setText(3, entry.get('description', ''))
@@ -218,7 +224,7 @@ class EntriesDialog(QDialog):
                     project_item = QTreeWidgetItem(self.tree)
                     project_item.setText(0, project_name or 'Sans projet')
                     total_duration = sum(entry.get('duration', 0) for entry in entries)
-                    project_item.setText(2, f"{total_duration}m")
+                    project_item.setText(2, self.minutes_to_hhmm(total_duration))
 
                     for entry in entries:
                         entry_timestamp = datetime.strptime(f"{entry.get('date', '')} {entry.get('time', '')}", "%Y-%m-%d %H:%M")
@@ -233,7 +239,7 @@ class EntriesDialog(QDialog):
                         
                         # Durée en vert
                         duration = entry.get('duration', 0)
-                        entry_item.setText(2, f"{duration}m")
+                        entry_item.setText(2, self.minutes_to_hhmm(duration))
                         entry_item.setForeground(2, QColor("#81c784"))
                         
                         entry_item.setText(3, entry.get('description', ''))

@@ -100,7 +100,7 @@ class SyncDialog(QDialog):
 
             # Durée
             duration = entry.get('duration', 0)
-            item.setText(4, f"{duration} min")
+            item.setText(4, self.minutes_to_hhmm(duration))
             item.setTextAlignment(4, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
             # Application des couleurs
@@ -121,6 +121,12 @@ class SyncDialog(QDialog):
             item.setData(0, Qt.ItemDataRole.UserRole, entry['id'])
 
             self.tree.addTopLevelItem(item)
+
+    def minutes_to_hhmm(self, minutes):
+        """Convertit une durée en minutes en format hh:mm."""
+        hours = minutes // 60
+        remaining_minutes = minutes % 60
+        return f"{hours:02d}h{remaining_minutes:02d}"
 
     def sync_with_jira(self):
         """Synchronise les entrées avec Jira."""
@@ -156,7 +162,7 @@ class SyncDialog(QDialog):
             entry_id = item.data(0, Qt.ItemDataRole.UserRole)
             ticket = item.text(2)
             description = item.text(3)
-            duration = float(item.text(4).rstrip(' min'))  # Convertit en minutes
+            duration = float(item.text(4).rstrip('h').split('h')[0]) * 60 + float(item.text(4).rstrip('h').split('h')[1].rstrip('m'))  # Convertit en minutes
             
             # Récupère la date et l'heure de l'entrée depuis la base de données
             entry = self.db.get_entry_by_id(entry_id)
