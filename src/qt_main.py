@@ -11,8 +11,9 @@ from PyQt6.QtWidgets import (
     QDateEdit, QTimeEdit
 )
 from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime
-from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
+from PyQt6.QtGui import QFont, QIcon, QPainter, QColor, QPalette
 import os
+import json
 
 from utils.database import Database
 from utils.autocomplete import AutocompleteLineEdit
@@ -22,8 +23,6 @@ from ui.config_dialog import ConfigDialog
 from ui.sync_dialog import SyncDialog
 from ui.entry_dialog import EntryDialog
 from ui.entries_dialog import EntriesDialog
-
-from PyQt6.QtWidgets import QMainWindow  # Added import statement
 
 class LogTrackerApp(QMainWindow):
     """Fenêtre principale de l'application."""
@@ -35,8 +34,25 @@ class LogTrackerApp(QMainWindow):
         self.entries_dialog = None
         self.config_dialog = None
         self.sync_dialog = None
+        self.last_entry_time = None
+        self.total_duration = 0
+        self.load_config()
         self.setup_ui()
         self.setup_timer()
+
+    def load_config(self):
+        """Charge la configuration."""
+        config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+                self.start_time = datetime.strptime(config.get('start_time', '08:00'), '%H:%M').time()
+                self.end_time = datetime.strptime(config.get('end_time', '18:00'), '%H:%M').time()
+                self.daily_hours = int(self.db.get_setting('daily_hours', '8'))
+        else:
+            self.start_time = datetime.strptime('08:00', '%H:%M').time()
+            self.end_time = datetime.strptime('18:00', '%H:%M').time()
+            self.daily_hours = 8
 
     def load_svg_icon(self, filename):
         """Charge une icône SVG depuis le dossier resources."""
@@ -211,12 +227,59 @@ class LogTrackerApp(QMainWindow):
         main_layout.addLayout(info_layout)
 
     def setup_timer(self):
-        """Configure le timer pour les rappels."""
+        """Configure le timer pour les vérifications périodiques."""
         self.timer = QTimer()
-        self.timer.timeout.connect(self.check_last_entry)
-        self.timer.timeout.connect(self.update_summary)  # Ajout de la mise à jour du résumé
+        self.timer.timeout.connect(self.check_alerts)
+        self.timer.timeout.connect(self.update_summary)
         self.timer.start(60000)  # Vérifie toutes les minutes
-        self.update_summary()  # Met à jour immédiatement au démarrage
+        self.update_summary()
+
+    def check_alerts(self):
+        """Vérifie les conditions d'alerte et met à jour l'interface."""
+        current_time = datetime.now().time()
+        current_date = datetime.now().date()
+
+        # Réinitialisation quotidienne
+        if self.last_entry_time and self.last_entry_time.date() != current_date:
+            self.last_entry_time = None
+            self.total_duration = 0
+
+        # Vérifie si on est dans les heures de travail
+        if current_time < self.start_time or current_time > self.end_time:
+            self.set_background_color("black")
+            return
+
+        # Calcul du temps d'inactivité
+        if self.last_entry_time:
+            inactive_time = datetime.now() - self.last_entry_time
+            inactive_hours = inactive_time.total_seconds() / 3600
+
+            if inactive_hours >= 2:
+                self.set_background_color("darkred")
+            elif inactive_hours >= 1:
+                self.set_background_color("darkorange")
+            else:
+                self.set_background_color("black")
+        else:
+            # Si aucune entrée aujourd'hui et dans les heures de travail
+            self.set_background_color("darkorange")
+
+        # Alerte de fin de journée
+        end_datetime = datetime.combine(current_date, self.end_time)
+        time_left = end_datetime - datetime.now()
+        if time_left.total_seconds() <= 1800 and self.total_duration < self.daily_hours * 60:  # 30 minutes
+            self.set_background_color("darkred")
+
+    def set_background_color(self, color):
+        """Change la couleur de fond de la fenêtre."""
+        palette = self.palette()
+        if color == "black":
+            palette.setColor(QPalette.ColorRole.Window, QColor("#000000"))
+        elif color == "darkorange":
+            palette.setColor(QPalette.ColorRole.Window, QColor("#FF8C00").darker(150))
+        elif color == "darkred":
+            palette.setColor(QPalette.ColorRole.Window, QColor("#8B0000"))
+        self.setPalette(palette)
 
     def update_summary(self):
         """Met à jour le résumé des entrées."""
@@ -263,10 +326,12 @@ class LogTrackerApp(QMainWindow):
 
     def show_entry_dialog(self):
         """Affiche la fenêtre de saisie."""
-        # Crée une nouvelle instance à chaque fois
+        if self.entry_dialog is not None:
+            self.entry_dialog.close()
         self.entry_dialog = EntryDialog(self, self.db)
 
         if self.entry_dialog.exec() == QDialog.DialogCode.Accepted:
+            self.last_entry_time = datetime.now()
             self.update_summary()
 
     def show_entries_dialog(self):
