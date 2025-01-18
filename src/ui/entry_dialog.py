@@ -238,6 +238,11 @@ class EntryDialog(QDialog):
         if project:
             tickets = self.db.get_project_tickets(project['id'])
             self.ticket_input.set_tickets(tickets)
+            # Sélectionne automatiquement le premier ticket s'il y en a
+            if tickets:
+                first_ticket = tickets[0]['ticket_number']
+                self.ticket_input.setText(first_ticket)
+                self.on_ticket_selected(first_ticket)
         else:
             self.ticket_input.set_tickets([])
 
@@ -360,4 +365,3 @@ class EntryDialog(QDialog):
 
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enregistrement : {str(e)}")
-
