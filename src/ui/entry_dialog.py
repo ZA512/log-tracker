@@ -225,22 +225,24 @@ class EntryDialog(QDialog):
             print(f"Erreur lors de l'initialisation des suggestions : {str(e)}")
 
     def on_project_changed(self, project_name):
-        """Appelé lorsque le projet change."""
-        if isinstance(project_name, str):
-            project_text = project_name
-        else:
-            project_text = project_name.text() if project_name else ""
+        """Appelé lorsque le projet sélectionné change."""
+        if not project_name:
+            self.ticket_input.set_tickets([])
+            return
 
-        # Récupère la liste des tickets pour ce projet
-        project = self.db.get_project_by_name(project_text)
-        if project:
-            tickets = self.db.get_project_tickets(project['id'])
+        # Récupère l'ID du projet
+        project = self.db.get_project_by_name(project_name)
+        if not project:
+            return
+
+        # Récupère les tickets du projet
+        tickets = self.db.get_project_tickets(project['id'])
+        if tickets:
+            # Met à jour la liste des tickets
             self.ticket_input.set_tickets(tickets)
-            # Sélectionne automatiquement le premier ticket s'il y en a
-            if tickets:
-                first_ticket = tickets[0]['ticket_number']
-                self.ticket_input.setText(first_ticket)
-                self.on_ticket_selected(first_ticket)
+            # Sélectionne le premier ticket mais sans déclencher la recherche du titre
+            first_ticket = tickets[0]['ticket_number']
+            self.ticket_input.setText(first_ticket)
         else:
             self.ticket_input.set_tickets([])
 
@@ -272,14 +274,13 @@ class EntryDialog(QDialog):
         # Récupère les informations du ticket
         ticket_info = self.db.get_ticket_info(project['id'], ticket_text)
         if ticket_info:
-            # Si le ticket existe mais n'a pas de titre, on essaie de le récupérer depuis Jira
-            if not ticket_info[2]:  # ticket_info[2] est le titre
-                self.fetch_ticket_title_from_jira(ticket_text)
-            else:
+            # Si le ticket existe, on utilise son titre stocké
+            if ticket_info[2]:  # ticket_info[2] est le titre
                 self.ticket_title.setText(ticket_info[2])
+            # Sinon on ne fait rien, la recherche se fera quand l'utilisateur modifiera le ticket
         else:
-            # Si le ticket n'existe pas encore, on essaie de récupérer son titre depuis Jira
-            self.fetch_ticket_title_from_jira(ticket_text)
+            # Si le ticket n'existe pas encore, on ne fait rien, la recherche se fera quand l'utilisateur modifiera le ticket
+            pass
 
     def fetch_ticket_title_from_jira(self, ticket_number):
         """Récupère le titre du ticket depuis Jira."""
