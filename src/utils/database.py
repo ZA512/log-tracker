@@ -38,7 +38,8 @@ class Database:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS projects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE
+                    name TEXT NOT NULL UNIQUE,
+                    is_active INTEGER DEFAULT 1
                 )
             """)
 
@@ -49,6 +50,7 @@ class Database:
                     project_id INTEGER,
                     ticket_number TEXT NOT NULL,
                     title TEXT,
+                    is_active INTEGER DEFAULT 1,
                     FOREIGN KEY (project_id) REFERENCES projects (id),
                     UNIQUE(project_id, ticket_number)
                 )
@@ -89,6 +91,36 @@ class Database:
             """)
 
             self.conn.commit()
+            
+            # Migration de la base de données si nécessaire
+            self.migrate_database()
+            
+        finally:
+            self.disconnect()
+    
+    def migrate_database(self):
+        """Migre la base de données vers la dernière version."""
+        try:
+            self.connect()
+            cursor = self.conn.cursor()
+
+            # Vérifie si la colonne is_active existe dans la table projects
+            cursor.execute("PRAGMA table_info(projects)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if 'is_active' not in columns:
+                print("Migration: Ajout de la colonne is_active à la table projects")
+                cursor.execute("ALTER TABLE projects ADD COLUMN is_active INTEGER DEFAULT 1")
+
+            # Vérifie si la colonne is_active existe dans la table tickets
+            cursor.execute("PRAGMA table_info(tickets)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if 'is_active' not in columns:
+                print("Migration: Ajout de la colonne is_active à la table tickets")
+                cursor.execute("ALTER TABLE tickets ADD COLUMN is_active INTEGER DEFAULT 1")
+
+            self.conn.commit()
+        except Exception as e:
+            print(f"Erreur lors de la migration : {str(e)}")
         finally:
             self.disconnect()
     
@@ -524,7 +556,8 @@ class Database:
                     'id': row[0],
                     'project_id': row[1],
                     'ticket_number': row[2],
-                    'title': row[3]
+                    'title': row[3],
+                    'is_active': row[4]
                 }
             return None
             
@@ -534,12 +567,13 @@ class Database:
         finally:
             self.disconnect()
     
-    def get_project_tickets(self, project_id):
+    def get_project_tickets(self, project_id, include_inactive=False):
         """
         Récupère tous les tickets associés à un projet, triés par date d'utilisation.
         
         Args:
             project_id: ID du projet
+            include_inactive: Si True, inclut aussi les tickets inactifs
             
         Returns:
             Liste des tickets, triée par date d'utilisation décroissante
@@ -547,18 +581,94 @@ class Database:
         self.connect()
         try:
             cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT DISTINCT t.ticket_number, t.title
+            query = """
+                SELECT DISTINCT t.ticket_number, t.title, COALESCE(t.is_active, 1) as is_active
                 FROM tickets t
                 LEFT JOIN entries e ON e.ticket_id = t.id
                 WHERE t.project_id = ?
+            """
+            if not include_inactive:
+                query += " AND COALESCE(t.is_active, 1) = 1"
+            query += """
                 GROUP BY t.ticket_number
                 ORDER BY MAX(e.date || ' ' || e.time) DESC NULLS LAST
-            """, (project_id,))
-            return [{'ticket_number': row['ticket_number'], 'title': row['title']} for row in cursor.fetchall()]
+            """
+            cursor.execute(query, (project_id,))
+            return [{'ticket_number': row['ticket_number'], 'title': row['title'], 'is_active': row['is_active']} for row in cursor.fetchall()]
         finally:
             self.disconnect()
+
+    def get_all_projects(self, include_inactive=False):
+        """
+        Récupère tous les projets avec leurs tickets.
+        
+        Args:
+            include_inactive: Si True, inclut aussi les projets inactifs
             
+        Returns:
+            Liste des projets avec leurs tickets
+        """
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            query = "SELECT id, name, is_active FROM projects"
+            if not include_inactive:
+                query += " WHERE is_active = 1"
+            query += " ORDER BY name"
+            
+            cursor.execute(query)
+            projects = []
+            for row in cursor.fetchall():
+                project = {
+                    'id': row['id'],
+                    'name': row['name'],
+                    'is_active': row['is_active'],
+                    'tickets': self.get_project_tickets(row['id'], include_inactive)
+                }
+                projects.append(project)
+            return projects
+        finally:
+            self.disconnect()
+
+    def toggle_project_active(self, project_id, is_active):
+        """
+        Active ou désactive un projet.
+        
+        Args:
+            project_id: ID du projet
+            is_active: True pour activer, False pour désactiver
+        """
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE projects SET is_active = ? WHERE id = ?",
+                (1 if is_active else 0, project_id)
+            )
+            self.conn.commit()
+        finally:
+            self.disconnect()
+
+    def toggle_ticket_active(self, project_id, ticket_number, is_active):
+        """
+        Active ou désactive un ticket.
+        
+        Args:
+            project_id: ID du projet
+            ticket_number: Numéro du ticket
+            is_active: True pour activer, False pour désactiver
+        """
+        self.connect()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE tickets SET is_active = ? WHERE project_id = ? AND ticket_number = ?",
+                (1 if is_active else 0, project_id, ticket_number)
+            )
+            self.conn.commit()
+        finally:
+            self.disconnect()
+
     def get_entry_by_id(self, entry_id):
         """Récupère une entrée par son ID."""
         self.connect()

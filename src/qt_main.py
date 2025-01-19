@@ -23,6 +23,7 @@ from ui.config_dialog import ConfigDialog
 from ui.sync_dialog import SyncDialog
 from ui.entry_dialog import EntryDialog
 from ui.entries_dialog import EntriesDialog
+from ui.projects_dialog import ProjectsDialog
 
 class LogTrackerApp(QMainWindow):
     """Fenêtre principale de l'application."""
@@ -34,6 +35,7 @@ class LogTrackerApp(QMainWindow):
         self.entries_dialog = None
         self.config_dialog = None
         self.sync_dialog = None
+        self.projects_dialog = None
         self.last_entry_time = None
         self.total_duration = 0
         self.load_config()
@@ -146,6 +148,7 @@ class LogTrackerApp(QMainWindow):
         list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
         sync_button = create_tool_button('refresh.svg', "Synchroniser vers jira", self.show_sync_dialog)
         config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
+        projects_button = create_tool_button('projects.svg', "Projets", self.show_projects_dialog)
 
         # Ajout des boutons à la barre d'outils
         toolbar.addWidget(add_button)
@@ -153,6 +156,7 @@ class LogTrackerApp(QMainWindow):
         toolbar.addWidget(sync_button)
         toolbar.addStretch()
         toolbar.addWidget(config_button)
+        toolbar.addWidget(projects_button)
 
         main_layout.addLayout(toolbar)
 
@@ -355,6 +359,13 @@ class LogTrackerApp(QMainWindow):
         self.sync_dialog.load_entries()  # Rafraîchit à chaque ouverture
         self.sync_dialog.show()
         self.sync_dialog.raise_()
+
+    def show_projects_dialog(self):
+        """Affiche la fenêtre de gestion des projets."""
+        if self.projects_dialog is not None:
+            self.projects_dialog.close()
+        self.projects_dialog = ProjectsDialog(self, self.db)
+        self.projects_dialog.exec()
 
     def check_last_entry(self):
         """Vérifie la dernière entrée et affiche une notification si nécessaire."""
