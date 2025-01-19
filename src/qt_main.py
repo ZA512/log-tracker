@@ -146,14 +146,17 @@ class LogTrackerApp(QMainWindow):
         # Création des boutons avec les icônes colorées
         add_button = create_tool_button('plus.svg', "Ajouter une entrée", self.show_entry_dialog)
         list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
-        sync_button = create_tool_button('refresh.svg', "Synchroniser vers jira", self.show_sync_dialog)
+        self.sync_button = create_tool_button('refresh.svg', "Synchroniser vers jira", self.show_sync_dialog)
         config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
         projects_button = create_tool_button('projects.svg', "Projets", self.show_projects_dialog)
+
+        # Met à jour l'état du bouton de synchronisation
+        self.update_sync_button_state()
 
         # Ajout des boutons à la barre d'outils
         toolbar.addWidget(add_button)
         toolbar.addWidget(list_button)
-        toolbar.addWidget(sync_button)
+        toolbar.addWidget(self.sync_button)
         toolbar.addStretch()
         toolbar.addWidget(config_button)
         toolbar.addWidget(projects_button)
@@ -229,6 +232,16 @@ class LogTrackerApp(QMainWindow):
         info_layout.addStretch()
         
         main_layout.addLayout(info_layout)
+
+    def update_sync_button_state(self):
+        """Met à jour l'état du bouton de synchronisation en fonction de la configuration Jira."""
+        config = self.db.get_jira_config()
+        is_configured = all(config.get(key) for key in ['jira_base_url', 'jira_email', 'jira_token'])
+        self.sync_button.setEnabled(is_configured)
+        if not is_configured:
+            self.sync_button.setToolTip("Jira n'est pas configuré. Allez dans les paramètres pour le configurer.")
+        else:
+            self.sync_button.setToolTip("Synchroniser vers Jira")
 
     def setup_timer(self):
         """Configure le timer pour les vérifications périodiques."""
@@ -348,9 +361,11 @@ class LogTrackerApp(QMainWindow):
 
     def show_config_dialog(self):
         """Affiche la fenêtre de configuration."""
-        if not self.config_dialog:
-            self.config_dialog = ConfigDialog(self)
-        self.config_dialog.show()
+        if self.config_dialog is not None:
+            self.config_dialog.close()
+        self.config_dialog = ConfigDialog(self, self.db)
+        if self.config_dialog.exec():
+            self.update_sync_button_state()
     
     def show_sync_dialog(self):
         """Affiche la fenêtre de synchronisation."""

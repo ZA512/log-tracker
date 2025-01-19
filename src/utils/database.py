@@ -702,3 +702,16 @@ class Database:
             return result['total_minutes'] or 0
         finally:
             self.disconnect()
+
+    def get_jira_config(self):
+        """
+        Récupère la configuration Jira complète.
+        
+        Returns:
+            dict: Configuration avec les clés jira_base_url, jira_email, et jira_token
+        """
+        return {
+            'jira_base_url': self.get_setting('jira_base_url'),
+            'jira_email': self.get_setting('jira_email'),
+            'jira_token': self.get_setting('jira_token')
+        }

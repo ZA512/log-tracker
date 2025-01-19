@@ -44,10 +44,8 @@ class EntryDialog(QDialog):
             if base_url and token and email:
                 from utils.jira_client import JiraClient
                 self.jira_client = JiraClient(base_url, token, email)
-            else:
-                print("Configuration Jira incomplète - URL, email ou token manquant")
         except Exception as e:
-            print(f"Erreur lors de la configuration du client Jira : {str(e)}")
+            pass
 
     def update_remaining_time(self, info_button):
         """Met à jour le tooltip avec le temps restant à saisir."""
@@ -286,7 +284,6 @@ class EntryDialog(QDialog):
     def fetch_ticket_title_from_jira(self, ticket_number):
         """Récupère le titre du ticket depuis Jira."""
         if not self.jira_client:
-            print("Client Jira non configuré")
             return
 
         try:
