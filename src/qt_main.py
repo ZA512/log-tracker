@@ -363,7 +363,7 @@ class LogTrackerApp(QMainWindow):
         """Affiche la fenêtre de configuration."""
         if self.config_dialog is not None:
             self.config_dialog.close()
-        self.config_dialog = ConfigDialog(self, self.db)
+        self.config_dialog = ConfigDialog(self)
         if self.config_dialog.exec():
             self.update_sync_button_state()
     
