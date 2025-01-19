@@ -283,7 +283,7 @@ class EntryDialog(QDialog):
             pass
 
     def fetch_ticket_title_from_jira(self, ticket_number):
-        """Récupère le titre du ticket depuis Jira."""
+        """Récupère le titre du ticket depuis Jira"""
         if not self.jira_client:
             return
 
