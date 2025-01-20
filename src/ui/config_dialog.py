@@ -4,7 +4,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox, QDateEdit,
-    QTimeEdit
+    QTimeEdit, QComboBox
 )
 from PyQt6.QtCore import Qt, QDate, QTime
 from PyQt6.QtGui import QIntValidator
@@ -26,7 +26,7 @@ class ConfigDialog(QDialog):
         """Configure l'interface utilisateur."""
         self.setWindowTitle("Configuration")
         self.setModal(True)
-        self.resize(400, 250)
+        self.resize(400, 300)
 
         layout = QVBoxLayout()
 
@@ -97,6 +97,16 @@ class ConfigDialog(QDialog):
         daily_hours_layout.addWidget(self.daily_hours_input)
         layout.addLayout(daily_hours_layout)
 
+        # Mode de calcul de l'heure
+        time_mode_layout = QHBoxLayout()
+        time_mode_label = QLabel("Mode de calcul de l'heure:")
+        self.time_mode_input = QComboBox()
+        self.time_mode_input.addItem("Heure actuelle", "0")
+        self.time_mode_input.addItem("Heure séquentielle", "1")
+        time_mode_layout.addWidget(time_mode_label)
+        time_mode_layout.addWidget(self.time_mode_input)
+        layout.addLayout(time_mode_layout)
+        
         # Boutons
         buttons_layout = QHBoxLayout()
         save_button = QPushButton("Sauvegarder")
@@ -110,40 +120,44 @@ class ConfigDialog(QDialog):
         self.setLayout(layout)
 
     def load_config(self):
-        """Charge la configuration depuis le fichier et la base de données."""
+        """Charge la configuration depuis la base de données."""
         try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r') as f:
-                    config = json.load(f)
-                    self.jira_token_input.setText(config.get('jira_token', ''))
-                    expiry_date = QDate.fromString(config.get('token_expiry', ''), Qt.DateFormat.ISODate)
-                    if expiry_date.isValid():
-                        self.token_expiry_input.setDate(expiry_date)
-                    start_time = QTime.fromString(config.get('start_time', '08:00'), "HH:mm")
-                    if start_time.isValid():
-                        self.start_time_input.setTime(start_time)
-                    end_time = QTime.fromString(config.get('end_time', '18:00'), "HH:mm")
-                    if end_time.isValid():
-                        self.end_time_input.setTime(end_time)
+            # Charge les paramètres Jira
+            self.jira_url_input.setText(self.db.get_setting('jira_base_url', ''))
+            self.jira_email_input.setText(self.db.get_setting('jira_email', ''))
+            self.jira_token_input.setText(self.db.get_setting('jira_token', ''))
+            
+            # Charge la date d'expiration
+            expiry_date = QDate.fromString(self.db.get_setting('token_expiry', ''), Qt.DateFormat.ISODate)
+            if expiry_date.isValid():
+                self.token_expiry_input.setDate(expiry_date)
+            
+            # Charge les heures de début et fin
+            start_time = QTime.fromString(self.db.get_setting('start_time', '08:00'), "HH:mm")
+            if start_time.isValid():
+                self.start_time_input.setTime(start_time)
+                
+            end_time = QTime.fromString(self.db.get_setting('end_time', '18:00'), "HH:mm")
+            if end_time.isValid():
+                self.end_time_input.setTime(end_time)
+            
+            # Charge les heures par jour
+            self.daily_hours_input.setText(self.db.get_setting('daily_hours', '8'))
+            
+            # Charge le mode de calcul de l'heure
+            use_sequential = self.db.get_setting('use_sequential_time', '0')
+            index = self.time_mode_input.findData(use_sequential)
+            if index >= 0:
+                self.time_mode_input.setCurrentIndex(index)
+            
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors du chargement de la configuration : {str(e)}")
 
-        self.jira_url_input.setText(self.db.get_setting('jira_base_url', ''))
-        self.jira_email_input.setText(self.db.get_setting('jira_email', ''))
-        self.daily_hours_input.setText(self.db.get_setting('daily_hours', '8'))
-
     def save_config(self):
-        """Sauvegarde la configuration dans le fichier et la base de données."""
+        """Sauvegarde la configuration dans la base de données."""
         try:
-            jira_url = self.jira_url_input.text().strip()
-            jira_email = self.jira_email_input.text().strip()
-            jira_token = self.jira_token_input.text().strip()
-            token_expiry = self.token_expiry_input.date().toString(Qt.DateFormat.ISODate)
-            start_time = self.start_time_input.time().toString("HH:mm")
-            end_time = self.end_time_input.time().toString("HH:mm")
-            daily_hours = self.daily_hours_input.text().strip() or '8'  # Utilise 8 si vide
-
             # Validation des heures par jour
+            daily_hours = self.daily_hours_input.text().strip() or '8'
             try:
                 hours = int(daily_hours)
                 if hours < 1 or hours > 24:
@@ -152,25 +166,25 @@ class ConfigDialog(QDialog):
                 QMessageBox.critical(self, "Erreur", f"Heures invalides : {str(e)}")
                 return
 
-
-            # Sauvegarde dans la base de données
-            self.db.save_setting('jira_base_url', jira_url)
-            self.db.save_setting('jira_email', jira_email)
+            # Sauvegarde les paramètres Jira
+            self.db.save_setting('jira_base_url', self.jira_url_input.text().strip())
+            self.db.save_setting('jira_email', self.jira_email_input.text().strip())
+            self.db.save_setting('jira_token', self.jira_token_input.text().strip())
+            
+            # Sauvegarde la date d'expiration
+            self.db.save_setting('token_expiry', self.token_expiry_input.date().toString(Qt.DateFormat.ISODate))
+            
+            # Sauvegarde les heures de début et fin
+            self.db.save_setting('start_time', self.start_time_input.time().toString("HH:mm"))
+            self.db.save_setting('end_time', self.end_time_input.time().toString("HH:mm"))
+            
+            # Sauvegarde les heures par jour
             self.db.save_setting('daily_hours', daily_hours)
-            self.db.save_setting('jira_token', jira_token)
-
-            # Sauvegarde dans le fichier de configuration
-            config = {
-                'jira_token': jira_token,
-                'token_expiry': token_expiry,
-                'start_time': start_time,
-                'end_time': end_time
-            }
-
-            with open(self.config_file, 'w') as f:
-                json.dump(config, f)
+            
+            # Sauvegarde le mode de calcul de l'heure
+            self.db.save_setting('use_sequential_time', self.time_mode_input.currentData())
 
             self.accept()
-
+            
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors de la sauvegarde : {str(e)}")

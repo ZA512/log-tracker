@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 import logging
 from datetime import datetime
 import os
+import json
 
 class Database:
     """Gestionnaire de la base de données SQLite."""
@@ -87,40 +88,14 @@ class Database:
                     ('jira_base_url', NULL),
                     ('jira_token', NULL),
                     ('jira_email', NULL),
-                    ('daily_hours', '8')
+                    ('daily_hours', '8'),
+                    ('token_expiry', NULL),
+                    ('start_time', '08:00'),
+                    ('end_time', '18:00'),
+                    ('use_sequential_time', '0')
             """)
 
             self.conn.commit()
-            
-            # Migration de la base de données si nécessaire
-            self.migrate_database()
-            
-        finally:
-            self.disconnect()
-    
-    def migrate_database(self):
-        """Migre la base de données vers la dernière version."""
-        try:
-            self.connect()
-            cursor = self.conn.cursor()
-
-            # Vérifie si la colonne is_active existe dans la table projects
-            cursor.execute("PRAGMA table_info(projects)")
-            columns = [col[1] for col in cursor.fetchall()]
-            if 'is_active' not in columns:
-                print("Migration: Ajout de la colonne is_active à la table projects")
-                cursor.execute("ALTER TABLE projects ADD COLUMN is_active INTEGER DEFAULT 1")
-
-            # Vérifie si la colonne is_active existe dans la table tickets
-            cursor.execute("PRAGMA table_info(tickets)")
-            columns = [col[1] for col in cursor.fetchall()]
-            if 'is_active' not in columns:
-                print("Migration: Ajout de la colonne is_active à la table tickets")
-                cursor.execute("ALTER TABLE tickets ADD COLUMN is_active INTEGER DEFAULT 1")
-
-            self.conn.commit()
-        except Exception as e:
-            print(f"Erreur lors de la migration : {str(e)}")
         finally:
             self.disconnect()
     
