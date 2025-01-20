@@ -3,9 +3,10 @@
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox, QDateEdit
+    QLineEdit, QPushButton, QMessageBox, QDateEdit,
+    QTimeEdit
 )
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt, QDate, QTime
 from PyQt6.QtGui import QIntValidator
 from utils.database import Database
 import json
@@ -25,7 +26,7 @@ class ConfigDialog(QDialog):
         """Configure l'interface utilisateur."""
         self.setWindowTitle("Configuration")
         self.setModal(True)
-        self.resize(400, 200)
+        self.resize(400, 250)
 
         layout = QVBoxLayout()
 
@@ -65,6 +66,26 @@ class ConfigDialog(QDialog):
         token_expiry_layout.addWidget(self.token_expiry_input)
         layout.addLayout(token_expiry_layout)
 
+        # Heure de début de journée
+        start_time_layout = QHBoxLayout()
+        start_time_label = QLabel("Heure de début de journée:")
+        self.start_time_input = QTimeEdit()
+        self.start_time_input.setDisplayFormat("HH:mm")
+        self.start_time_input.setTime(QTime(8, 0))  # 08:00 par défaut
+        start_time_layout.addWidget(start_time_label)
+        start_time_layout.addWidget(self.start_time_input)
+        layout.addLayout(start_time_layout)
+
+        # Heure de fin de journée
+        end_time_layout = QHBoxLayout()
+        end_time_label = QLabel("Heure de fin de journée:")
+        self.end_time_input = QTimeEdit()
+        self.end_time_input.setDisplayFormat("HH:mm")
+        self.end_time_input.setTime(QTime(18, 0))  # 18:00 par défaut
+        end_time_layout.addWidget(end_time_label)
+        end_time_layout.addWidget(self.end_time_input)
+        layout.addLayout(end_time_layout)
+
         # Heures par jour
         daily_hours_layout = QHBoxLayout()
         daily_hours_label = QLabel("Heures de travail par jour:")
@@ -98,6 +119,12 @@ class ConfigDialog(QDialog):
                     expiry_date = QDate.fromString(config.get('token_expiry', ''), Qt.DateFormat.ISODate)
                     if expiry_date.isValid():
                         self.token_expiry_input.setDate(expiry_date)
+                    start_time = QTime.fromString(config.get('start_time', '08:00'), "HH:mm")
+                    if start_time.isValid():
+                        self.start_time_input.setTime(start_time)
+                    end_time = QTime.fromString(config.get('end_time', '18:00'), "HH:mm")
+                    if end_time.isValid():
+                        self.end_time_input.setTime(end_time)
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors du chargement de la configuration : {str(e)}")
 
@@ -112,6 +139,8 @@ class ConfigDialog(QDialog):
             jira_email = self.jira_email_input.text().strip()
             jira_token = self.jira_token_input.text().strip()
             token_expiry = self.token_expiry_input.date().toString(Qt.DateFormat.ISODate)
+            start_time = self.start_time_input.time().toString("HH:mm")
+            end_time = self.end_time_input.time().toString("HH:mm")
             daily_hours = self.daily_hours_input.text().strip() or '8'  # Utilise 8 si vide
 
             # Validation des heures par jour
@@ -123,10 +152,6 @@ class ConfigDialog(QDialog):
                 QMessageBox.critical(self, "Erreur", f"Heures invalides : {str(e)}")
                 return
 
-            # Validation basique
-            if not jira_email or '@' not in jira_email:
-                QMessageBox.warning(self, "Erreur", "Veuillez entrer une adresse email valide")
-                return
 
             # Sauvegarde dans la base de données
             self.db.save_setting('jira_base_url', jira_url)
@@ -137,7 +162,9 @@ class ConfigDialog(QDialog):
             # Sauvegarde dans le fichier de configuration
             config = {
                 'jira_token': jira_token,
-                'token_expiry': token_expiry
+                'token_expiry': token_expiry,
+                'start_time': start_time,
+                'end_time': end_time
             }
 
             with open(self.config_file, 'w') as f:
