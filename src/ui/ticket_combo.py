@@ -11,6 +11,7 @@ class TicketComboBox(QWidget):
         self.setup_ui()
         self.tickets = []
         self.ticket_data = {}  # Stocke les données complètes des tickets
+        self.is_new_ticket = False
     
     def setup_ui(self):
         """Configure l'interface utilisateur."""
@@ -40,14 +41,19 @@ class TicketComboBox(QWidget):
     
     def _on_index_changed(self, index):
         """Appelé quand l'index de la combobox change."""
-        if index >= 0:
+        if index == 0:  # Option "Nouveau ticket"
+            self.is_new_ticket = True
+            self.combo.setEditText("")
+            self.ticketChanged.emit("")
+        elif index > 0:  # Un ticket existant
+            self.is_new_ticket = False
             ticket_number = self.combo.itemData(index)
             self.combo.setEditText(ticket_number)  # Affiche uniquement le numéro de ticket
             self.ticketChanged.emit(ticket_number)
     
     def _on_text_changed(self, text):
         """Gère la saisie manuelle de texte."""
-        if not self.combo.currentData():  # Si aucun item n'est sélectionné
+        if self.is_new_ticket or not self.combo.currentData():  # Si c'est un nouveau ticket ou aucun item n'est sélectionné
             self.ticketChanged.emit(text)
     
     def set_tickets(self, tickets, current_ticket=None):
@@ -63,6 +69,11 @@ class TicketComboBox(QWidget):
         
         # Met à jour la combobox avec les tickets et leurs titres
         self.combo.clear()
+        
+        # Ajoute l'option "Nouveau ticket"
+        self.combo.addItem("Nouveau ticket", None)
+        
+        # Ajoute les tickets existants
         for ticket in tickets:
             display_text = f"{ticket['ticket_number']} - {ticket['title']}" if ticket['title'] else ticket['ticket_number']
             self.combo.addItem(display_text, ticket['ticket_number'])
@@ -73,7 +84,7 @@ class TicketComboBox(QWidget):
             if index >= 0:
                 self.combo.setCurrentIndex(index)
         elif self.tickets:
-            self.combo.setCurrentIndex(-1)  # Aucune sélection par défaut
+            self.combo.setCurrentIndex(1)  # Sélectionne le premier ticket existant
         
         # Met à jour le compteur
         self._update_count_label()
@@ -88,11 +99,15 @@ class TicketComboBox(QWidget):
     
     def clear(self):
         """Efface le contenu de la combobox."""
-        self.combo.setCurrentText("")
+        self.combo.clear()
+        self.combo.addItem("Nouveau ticket", None)
         self.ticket_data = {}
+        self.is_new_ticket = True
     
     def text(self):
         """Retourne le texte actuel (numéro de ticket uniquement)."""
+        if self.is_new_ticket:
+            return self.combo.currentText()
         current_data = self.combo.currentData()
         if current_data:
             return current_data
@@ -100,8 +115,14 @@ class TicketComboBox(QWidget):
     
     def setText(self, text):
         """Définit le texte de la combobox."""
-        index = self.combo.findData(text)
-        if index >= 0:
-            self.combo.setCurrentIndex(index)
+        if not text:
+            self.combo.setCurrentIndex(0)  # Sélectionne "Nouveau ticket"
+            self.is_new_ticket = True
         else:
-            self.combo.setCurrentText(text)
+            index = self.combo.findData(text)
+            if index >= 0:
+                self.combo.setCurrentIndex(index)
+                self.is_new_ticket = False
+            else:
+                self.combo.setEditText(text)
+                self.is_new_ticket = True
