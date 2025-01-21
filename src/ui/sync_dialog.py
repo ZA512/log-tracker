@@ -32,7 +32,7 @@ class SyncDialog(QDialog):
 
         # Liste des entrées
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Date", "Projet", "Ticket", "Description", "Durée"])
+        self.tree.setHeaderLabels(["Date", "Projet", "Ticket", "Fait", "Durée"])
         self.tree.setColumnWidth(0, 150)  # Date
         self.tree.setColumnWidth(1, 150)  # Projet
         self.tree.setColumnWidth(2, 100)  # Ticket

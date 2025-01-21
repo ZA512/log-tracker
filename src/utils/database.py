@@ -16,6 +16,7 @@ class Database:
         self.db_path = os.path.join(self.db_dir, 'logtracker.db')
         self.conn = None
         self.create_tables()
+        self.migrate_database()
     
     def connect(self):
         """Établit une connexion à la base de données."""
@@ -69,6 +70,7 @@ class Database:
                     time TEXT NOT NULL,
                     is_synced INTEGER DEFAULT 0,
                     ticket_title TEXT,
+                    todo TEXT DEFAULT NULL,
                     FOREIGN KEY (project_id) REFERENCES projects (id),
                     FOREIGN KEY (ticket_id) REFERENCES tickets (id)
                 )
@@ -96,6 +98,27 @@ class Database:
             """)
 
             self.conn.commit()
+        finally:
+            self.disconnect()
+    
+    def migrate_database(self):
+        """Effectue les migrations nécessaires de la base de données."""
+        try:
+            self.connect()
+            
+            # Vérifie si la colonne todo existe
+            cursor = self.conn.cursor()
+            cursor.execute("PRAGMA table_info(entries)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            # Ajoute la colonne todo si elle n'existe pas
+            if 'todo' not in columns:
+                cursor.execute("ALTER TABLE entries ADD COLUMN todo TEXT DEFAULT NULL")
+                self.conn.commit()
+                print("Migration: Colonne 'todo' ajoutée avec succès")
+                
+        except Exception as e:
+            print(f"Erreur lors de la migration : {str(e)}")
         finally:
             self.disconnect()
     
@@ -204,7 +227,7 @@ class Database:
         finally:
             self.disconnect()
     
-    def add_entry(self, description, project_id=None, ticket_id=None, duration=60, ticket_title=None, date=None, time=None):
+    def add_entry(self, description, project_id=None, ticket_id=None, duration=60, ticket_title=None, date=None, time=None, todo=None):
         """Ajoute une nouvelle entrée."""
         try:
             self.connect()
@@ -217,9 +240,9 @@ class Database:
                 time = now.strftime("%H:%M")
 
             cursor.execute("""
-                INSERT INTO entries (project_id, ticket_id, description, duration, date, time, ticket_title)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (project_id, ticket_id, description, duration, date, time, ticket_title))
+                INSERT INTO entries (project_id, ticket_id, description, duration, date, time, ticket_title, todo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (project_id, ticket_id, description, duration, date, time, ticket_title, todo))
             
             self.conn.commit()
             return cursor.lastrowid
@@ -240,6 +263,7 @@ class Database:
                     e.date,
                     e.time,
                     e.ticket_title,
+                    e.todo,
                     p.name as project_name,
                     t.ticket_number
                 FROM entries e
@@ -475,6 +499,7 @@ class Database:
                     e.description, 
                     e.duration, 
                     e.ticket_title,
+                    e.todo,
                     p.name as project_name,
                     t.ticket_number as ticket_number
                 FROM entries e
