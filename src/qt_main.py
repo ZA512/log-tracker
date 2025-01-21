@@ -97,6 +97,11 @@ class LogTrackerApp(QMainWindow):
         self.setWindowTitle("Log Tracker")
         self.resize(300, 100)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        
+        # Définir l'icône de la fenêtre
+        window_icon = self.load_svg_icon("calendar-days.svg")
+        self.setWindowIcon(window_icon)
+        
         self.setStyleSheet("""\
             QMainWindow {
                 background-color: #1e1e1e;
