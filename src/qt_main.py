@@ -334,7 +334,7 @@ class LogTrackerApp(QMainWindow):
             if color == "black":
                 bg_color = "#1e1e1e"
             elif color == "darkorange":
-                bg_color = "#8B4513"  # Plus foncé que FF8C00
+                bg_color = "#D2691E"  # Plus foncé que FF8C00
             elif color == "darkred":
                 bg_color = "#8B0000"
             else:
