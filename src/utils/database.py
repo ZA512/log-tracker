@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 import os
 import json
+from PyQt6.QtCore import QDate
 
 class Database:
     """Gestionnaire de la base de données SQLite."""
@@ -715,3 +716,54 @@ class Database:
             'jira_email': self.get_setting('jira_email'),
             'jira_token': self.get_setting('jira_token')
         }
+
+    def get_sequential_time(self, date=None):
+        """Retourne l'heure séquentielle pour une nouvelle entrée.
+        
+        L'heure retournée est basée sur le dernier événement de la journée :
+        heure du dernier événement + sa durée
+        
+        Args:
+            date: Date pour laquelle calculer l'heure (format: YYYY-MM-DD)
+                 Si None, utilise la date du jour
+                 
+        Returns:
+            str: Heure au format HH:mm
+        """
+        if not date:
+            date = QDate.currentDate().toString("yyyy-MM-dd")
+            
+        # Récupère le dernier événement de la journée
+        query = """
+            SELECT time, duration 
+            FROM entries 
+            WHERE date = ? 
+            ORDER BY time DESC
+            LIMIT 1
+        """
+        self.connect()
+        cursor = self.conn.cursor()
+        cursor.execute(query, (date,))
+        last_entry = cursor.fetchone()
+        
+        if not last_entry:
+            # Si pas d'événement ce jour, utilise l'heure de début configurée
+            return self.get_setting('start_time')
+            
+        # Convertit l'heure du dernier événement en minutes depuis minuit
+        last_time = last_entry['time']
+        hours, minutes = map(int, last_time.split(':'))
+        total_minutes = hours * 60 + minutes
+        
+        # Ajoute la durée du dernier événement
+        total_minutes += last_entry['duration']
+        
+        # Convertit en heures:minutes
+        new_hours = total_minutes // 60
+        new_minutes = total_minutes % 60
+        
+        # Si on dépasse minuit, on reste à 23:59
+        if new_hours >= 24:
+            return "23:59"
+            
+        return f"{new_hours:02d}:{new_minutes:02d}"

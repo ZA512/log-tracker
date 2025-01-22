@@ -76,31 +76,6 @@ class EntryDialog(QDialog):
         except Exception as e:
             info_button.setToolTip(f"Erreur lors du calcul du temps restant : {str(e)}")
 
-    def get_sequential_time(self):
-        """Calcule l'heure séquentielle en fonction des entrées existantes."""
-        try:
-            # Récupère l'heure de début depuis les paramètres
-            start_time_str = self.db.get_setting('start_time', '08:00')
-            start_time = QTime.fromString(start_time_str, "HH:mm")
-            
-            # Convertit QDate en datetime.date
-            qdate = self.date_input.date()
-            py_date = date(qdate.year(), qdate.month(), qdate.day())
-            
-            # Récupère toutes les entrées de la journée
-            entries = self.db.get_entries_for_day(py_date)
-            
-            # Calcule la durée totale des entrées
-            total_minutes = 0
-            for entry in entries:
-                total_minutes += entry['duration']
-            
-            # Ajoute la durée totale à l'heure de début
-            return start_time.addSecs(total_minutes * 60)
-        except Exception as e:
-            print(f"Erreur lors du calcul de l'heure séquentielle : {str(e)}")
-            return QTime.currentTime()
-
     def setup_ui(self):
         """Configure l'interface utilisateur."""
         self.setWindowTitle("Ajouter une entrée")
@@ -119,7 +94,8 @@ class EntryDialog(QDialog):
         
         self.time_input = QTimeEdit()
         if self.db.get_setting('use_sequential_time', '0') == '1':
-            self.time_input.setTime(self.get_sequential_time())
+            sequential_time = self.db.get_sequential_time(self.date_input.date().toString("yyyy-MM-dd"))
+            self.time_input.setTime(QTime.fromString(sequential_time, "HH:mm"))
         else:
             self.time_input.setTime(QTime.currentTime())
         self.time_input.setDisplayFormat("HH:mm")
@@ -236,7 +212,8 @@ class EntryDialog(QDialog):
         # Remet la date et l'heure actuelles
         self.date_input.setDate(QDate.currentDate())
         if self.db.get_setting('use_sequential_time', '0') == '1':
-            self.time_input.setTime(self.get_sequential_time())
+            sequential_time = self.db.get_sequential_time(self.date_input.date().toString("yyyy-MM-dd"))
+            self.time_input.setTime(QTime.fromString(sequential_time, "HH:mm"))
         else:
             self.time_input.setTime(QTime.currentTime())
         

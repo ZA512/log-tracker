@@ -45,7 +45,3 @@ RELEASE_INSTRUCTIONS.md
 # test
 *.test
 *.tests
-
-# secret
-src/config.json
-src/config-bak.json
