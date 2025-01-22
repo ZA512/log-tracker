@@ -144,9 +144,16 @@ class EntryDialog(QDialog):
         self.ticket_title.focusInEvent = self.on_title_focus
         form_layout.addRow("Titre:", self.ticket_title)
 
-        # Description
+        # Fait
         self.description_input = QTextEdit()
-        form_layout.addRow("Description:", self.description_input)
+        self.description_input.setFixedHeight(75)  # Hauteur réduite
+        form_layout.addRow("Fait:", self.description_input)
+
+        # A faire
+        self.todo_input = QTextEdit()
+        self.todo_input.setFixedHeight(75)  # Même hauteur que la description
+        self.todo_input.setPlaceholderText("Optionnel")
+        form_layout.addRow("A faire:", self.todo_input)
 
         # Durée avec label "minutes" à droite et boutons de raccourcis
         duration_widget = QWidget()
@@ -238,6 +245,7 @@ class EntryDialog(QDialog):
         self.ticket_input.clear()
         self.ticket_title.clear()
         self.description_input.clear()
+        self.todo_input.clear()
         self.duration_input.setValue(60)
         
         # Recharge les projets pour l'autocomplétion seulement à l'initialisation
@@ -350,6 +358,7 @@ class EntryDialog(QDialog):
         project_name = self.project_input.text()
         ticket_number = self.ticket_input.text()
         description = self.description_input.toPlainText()
+        todo = self.todo_input.toPlainText()
         duration = self.duration_input.value()
         ticket_title = self.ticket_title.text()
         date = self.date_input.date().toString("yyyy-MM-dd")
@@ -382,10 +391,11 @@ class EntryDialog(QDialog):
             # Ajoute l'entrée
             self.db.add_entry(
                 description=description,
+                todo=todo,
                 project_id=project_id,
                 ticket_id=ticket_id,
-                duration=duration,
                 ticket_title=ticket_title,
+                duration=duration,
                 date=date,
                 time=time
             )

@@ -41,6 +41,15 @@ class LogTrackerApp(QMainWindow):
         self.load_config()
         self.setup_ui()
         self.setup_timer()
+        
+        # Initialise last_entry_time avec la dernière entrée
+        try:
+            entries = self.db.get_entries_for_day(datetime.now().date())
+            if entries:
+                last_entry = entries[0]  # La première entrée est la plus récente
+                self.last_entry_time = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
+        except Exception as e:
+            print(f"Erreur lors de l'initialisation de last_entry_time : {str(e)}")
 
     def load_config(self):
         """Charge la configuration."""
@@ -88,6 +97,11 @@ class LogTrackerApp(QMainWindow):
         self.setWindowTitle("Log Tracker")
         self.resize(300, 100)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        
+        # Définir l'icône de la fenêtre
+        window_icon = self.load_svg_icon("calendar-days.svg")
+        self.setWindowIcon(window_icon)
+        
         self.setStyleSheet("""\
             QMainWindow {
                 background-color: #1e1e1e;
@@ -289,14 +303,47 @@ class LogTrackerApp(QMainWindow):
 
     def set_background_color(self, color):
         """Change la couleur de fond de la fenêtre."""
-        palette = self.palette()
-        if color == "black":
-            palette.setColor(QPalette.ColorRole.Window, QColor("#000000"))
-        elif color == "darkorange":
-            palette.setColor(QPalette.ColorRole.Window, QColor("#FF8C00").darker(150))
-        elif color == "darkred":
-            palette.setColor(QPalette.ColorRole.Window, QColor("#8B0000"))
-        self.setPalette(palette)
+        try:
+            base_style = """
+                QWidget {
+                    background-color: %s;
+                    color: #d0d0d1;
+                }
+                QToolButton {
+                    border: none;
+                    padding: 5px;
+                    color: #d0d0d1;
+                    background: transparent;
+                }
+                QToolButton:hover {
+                    background-color: #333333;
+                    border-radius: 3px;
+                }
+                QLabel {
+                    color: #d0d0d1;
+                    font-size: 13px;
+                    background: transparent;
+                }
+                QFrame[frameShape="4"] {  /* HLine */
+                    background-color: #333333;
+                    max-height: 1px;
+                    border: none;
+                }
+            """
+            
+            if color == "black":
+                bg_color = "#1e1e1e"
+            elif color == "darkorange":
+                bg_color = "#8B4513"  # Plus foncé que FF8C00
+            elif color == "darkred":
+                bg_color = "#8B0000"
+            else:
+                bg_color = "#1e1e1e"
+                
+            self.setStyleSheet(base_style % bg_color)
+                
+        except Exception as e:
+            print(f"Erreur lors du changement de couleur : {str(e)}")
 
     def update_summary(self):
         """Met à jour le résumé des entrées."""
@@ -348,8 +395,13 @@ class LogTrackerApp(QMainWindow):
         self.entry_dialog = EntryDialog(self, self.db)
 
         if self.entry_dialog.exec() == QDialog.DialogCode.Accepted:
-            self.last_entry_time = datetime.now()
+            # Met à jour last_entry_time avec la nouvelle entrée
+            entries = self.db.get_entries_for_day(datetime.now().date())
+            if entries:
+                last_entry = entries[0]  # La première entrée est la plus récente
+                self.last_entry_time = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
             self.update_summary()
+            self.check_alerts()  # Force la vérification des alertes
 
     def show_entries_dialog(self):
         """Affiche la fenêtre des entrées."""

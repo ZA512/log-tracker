@@ -32,7 +32,7 @@ class EntriesDialog(QDialog):
     def setup_ui(self):
         """Configure l'interface utilisateur."""
         self.setWindowTitle("Entrées")
-        self.resize(800, 500)
+        self.resize(800, 600)
 
         # Layout principal
         layout = QVBoxLayout()
@@ -71,14 +71,17 @@ class EntriesDialog(QDialog):
 
         # Configuration du QTreeWidget
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Projet", "Ticket", "Durée", "Description", "Date", "Heure", ""])  # Colonne vide pour le retour à la ligne
+        self.tree.setHeaderLabels([
+            "Projet", "Ticket", "Durée", "Titre", "Fait", "A faire", "Date", "Heure"
+        ])
         self.tree.setColumnWidth(0, 150)  # Projet
         self.tree.setColumnWidth(1, 100)  # Ticket
         self.tree.setColumnWidth(2, 80)   # Durée
-        self.tree.setColumnWidth(3, 400)  # Description
-        self.tree.setColumnWidth(4, 100)  # Date
-        self.tree.setColumnWidth(5, 60)   # Heure
-        self.tree.setColumnWidth(6, 10)   # Colonne vide
+        self.tree.setColumnWidth(3, 200)  # Titre
+        self.tree.setColumnWidth(4, 300)  # Fait
+        self.tree.setColumnWidth(5, 150)  # A faire
+        self.tree.setColumnWidth(6, 100)  # Date
+        self.tree.setColumnWidth(7, 60)   # Heure
         self.tree.setWordWrap(True)
         layout.addWidget(self.tree)
 
@@ -133,24 +136,16 @@ class EntriesDialog(QDialog):
 
                     for entry in project_entries:
                         entry_item = QTreeWidgetItem(project_item)
-                        entry_item.setText(0, "")  # Projet déjà affiché dans le parent
-                        
-                        # Ticket en bleu
-                        ticket = entry.get('ticket_number', '')
-                        entry_item.setText(1, ticket)
-                        if ticket:
-                            entry_item.setForeground(1, QColor("#64b5f6"))
-                        
-                        # Durée en vert
-                        duration = entry.get('duration', 0)
-                        entry_item.setText(2, self.minutes_to_hhmm(duration))
-                        entry_item.setForeground(2, QColor("#81c784"))
-                        
-                        entry_item.setText(3, entry.get('description', ''))
-                        entry_item.setText(4, entry.get('date', ''))
-                        entry_item.setText(5, entry.get('time', ''))
+                        entry_item.setText(0, entry.get('project_name', ''))
+                        entry_item.setText(1, entry.get('ticket_number', ''))
+                        entry_item.setText(2, self.minutes_to_hhmm(entry.get('duration', 0)))
+                        entry_item.setText(3, entry.get('ticket_title', ''))
+                        entry_item.setText(4, entry.get('description', ''))
+                        entry_item.setText(5, entry.get('todo', ''))
+                        entry_item.setText(6, entry.get('date', ''))
+                        entry_item.setText(7, entry.get('time', ''))
 
-                        for col in range(7):
+                        for col in range(8):
                             entry_item.setTextAlignment(col, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
                 self.tree.expandAll()
@@ -194,23 +189,15 @@ class EntriesDialog(QDialog):
                         entry_timestamp = datetime.strptime(f"{entry.get('date', '')} {entry.get('time', '')}", "%Y-%m-%d %H:%M")
                         entry_item = QTreeWidgetItem(date_item)
                         entry_item.setText(0, entry.get('project_name', ''))
-                        
-                        # Ticket en bleu
-                        ticket = entry.get('ticket_number', '')
-                        entry_item.setText(1, ticket)
-                        if ticket:
-                            entry_item.setForeground(1, QColor("#64b5f6"))
-                        
-                        # Durée en vert
-                        duration = entry.get('duration', 0)
-                        entry_item.setText(2, self.minutes_to_hhmm(duration))
-                        entry_item.setForeground(2, QColor("#81c784"))
-                        
-                        entry_item.setText(3, entry.get('description', ''))
-                        entry_item.setText(4, entry.get('date', ''))
-                        entry_item.setText(5, entry.get('time', ''))
+                        entry_item.setText(1, entry.get('ticket_number', ''))
+                        entry_item.setText(2, self.minutes_to_hhmm(entry.get('duration', 0)))
+                        entry_item.setText(3, entry.get('ticket_title', ''))
+                        entry_item.setText(4, entry.get('description', ''))
+                        entry_item.setText(5, entry.get('todo', ''))
+                        entry_item.setText(6, entry.get('date', ''))
+                        entry_item.setText(7, entry.get('time', ''))
 
-                        for col in range(7):
+                        for col in range(8):
                             entry_item.setTextAlignment(col, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
                 self.tree.expandAll()
@@ -229,24 +216,16 @@ class EntriesDialog(QDialog):
                     for entry in entries:
                         entry_timestamp = datetime.strptime(f"{entry.get('date', '')} {entry.get('time', '')}", "%Y-%m-%d %H:%M")
                         entry_item = QTreeWidgetItem(project_item)
-                        entry_item.setText(0, "")  # Projet déjà affiché dans le parent
-                        
-                        # Ticket en bleu
-                        ticket = entry.get('ticket_number', '')
-                        entry_item.setText(1, ticket)
-                        if ticket:
-                            entry_item.setForeground(1, QColor("#64b5f6"))
-                        
-                        # Durée en vert
-                        duration = entry.get('duration', 0)
-                        entry_item.setText(2, self.minutes_to_hhmm(duration))
-                        entry_item.setForeground(2, QColor("#81c784"))
-                        
-                        entry_item.setText(3, entry.get('description', ''))
-                        entry_item.setText(4, entry.get('date', ''))
-                        entry_item.setText(5, entry.get('time', ''))
+                        entry_item.setText(0, entry.get('project_name', ''))
+                        entry_item.setText(1, entry.get('ticket_number', ''))
+                        entry_item.setText(2, self.minutes_to_hhmm(entry.get('duration', 0)))
+                        entry_item.setText(3, entry.get('ticket_title', ''))
+                        entry_item.setText(4, entry.get('description', ''))
+                        entry_item.setText(5, entry.get('todo', ''))
+                        entry_item.setText(6, entry.get('date', ''))
+                        entry_item.setText(7, entry.get('time', ''))
 
-                        for col in range(7):
+                        for col in range(8):
                             entry_item.setTextAlignment(col, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
                 self.tree.expandAll()
