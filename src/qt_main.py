@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QTextEdit, QTreeWidget, QTreeWidgetItem,
     QFrame, QSpinBox, QComboBox, QRadioButton, QButtonGroup, QGroupBox,
     QSplitter, QDialog, QFormLayout, QStyle, QToolButton, QDialogButtonBox, QMessageBox,
-    QDateEdit, QTimeEdit
+    QDateEdit, QTimeEdit, QStatusBar
 )
 from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime
 from PyQt6.QtGui import QFont, QIcon, QPainter, QColor, QPalette
@@ -38,6 +38,10 @@ class LogTrackerApp(QMainWindow):
         self.projects_dialog = None
         self.last_entry_time = None
         self.total_duration = 0
+        
+        # État de l'alerte
+        self.alert_state = "normal"
+        
         self.load_config()
         self.setup_ui()
         self.setup_timer()
@@ -50,6 +54,9 @@ class LogTrackerApp(QMainWindow):
                 self.last_entry_time = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
         except Exception as e:
             print(f"Erreur lors de l'initialisation de last_entry_time : {str(e)}")
+            
+        # Démarre la vérification des entrées
+        self.check_entry_status()
 
     def load_config(self):
         """Charge la configuration."""
@@ -247,6 +254,11 @@ class LogTrackerApp(QMainWindow):
         
         main_layout.addLayout(info_layout)
 
+        # Barre de statut
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+        self.status_bar.showMessage("")
+
     def update_sync_button_state(self):
         """Met à jour l'état du bouton de synchronisation en fonction de la configuration Jira."""
         config = self.db.get_jira_config()
@@ -388,6 +400,81 @@ class LogTrackerApp(QMainWindow):
         except Exception as e:
             print(f"Erreur lors de la mise à jour du résumé : {str(e)}")
 
+    def set_alert_state(self, state):
+        """Change l'état d'alerte et met à jour la couleur de la barre de statut."""
+        self.alert_state = state
+        
+        # Couleurs pour chaque état
+        colors = {
+            "normal": "",  # Style par défaut
+            "warning": """
+                QStatusBar {
+                    background-color: #FF9800;
+                    color: white;
+                }
+            """,
+            "danger": """
+                QStatusBar {
+                    background-color: #F44336;
+                    color: white;
+                }
+            """
+        }
+        
+        messages = {
+            "normal": "",
+            "warning": "1 heure sans entrée",
+            "danger": ">2 heures sans entrée"
+        }
+        
+        # Applique le style et le message
+        if state in colors:
+            self.status_bar.setStyleSheet(colors[state])
+            self.status_bar.showMessage(messages[state])
+            
+    def check_entry_status(self):
+        """Vérifie le temps écoulé depuis la dernière entrée et met à jour l'état d'alerte."""
+        try:
+            now = datetime.now()
+            entries = self.db.get_entries_for_day(now.date())
+            
+            if not entries:
+                self.set_alert_state("danger")
+                return
+                
+            # Trie les entrées par date et heure pour être sûr d'avoir la plus récente
+            entries.sort(key=lambda x: (x['date'], x['time']), reverse=True)
+            
+            # Prend l'entrée la plus récente
+            last_entry = entries[0]
+            
+            # Calcule la date/heure de fin de la dernière entrée
+            entry_datetime = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
+            print("entry_datetime", entry_datetime)
+            end_datetime = entry_datetime + timedelta(minutes=last_entry['duration'])
+            print("end_datetime", end_datetime)
+            
+            # Calcule la différence entre maintenant et la fin de la dernière entrée
+            time_diff = now - end_datetime
+            hours_diff = time_diff.total_seconds() / 3600  # Convertit en heures
+            
+            if hours_diff <= 1:
+                # Moins d'une heure : normal
+                self.set_alert_state("normal")
+            elif hours_diff <= 2:
+                # Entre 1 et 2 heures : warning
+                self.set_alert_state("warning")
+            else:
+                # Plus de 2 heures : danger
+                self.set_alert_state("danger")
+            
+        except Exception as e:
+            print(f"Erreur lors de la vérification des entrées : {str(e)}")
+            self.set_alert_state("normal")
+        
+        # Vérifie à nouveau dans 5 minutes
+        QTimer.singleShot(5 * 60 * 1000, self.check_entry_status)
+        
     def show_entry_dialog(self):
         """Affiche la fenêtre de saisie."""
         if self.entry_dialog is not None:

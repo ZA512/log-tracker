@@ -16,6 +16,7 @@ class Database:
         os.makedirs(self.db_dir, exist_ok=True)
         self.db_path = os.path.join(self.db_dir, 'logtracker.db')
         self.conn = None
+        self.cursor = None
         self.create_tables()
         self.migrate_database()
     
@@ -24,30 +25,41 @@ class Database:
         if self.conn is None:
             self.conn = sqlite3.connect(self.db_path)
             self.conn.row_factory = sqlite3.Row
+            self.cursor = self.conn.cursor()
     
     def disconnect(self):
         """Ferme la connexion à la base de données."""
         if self.conn:
             self.conn.close()
             self.conn = None
+            self.cursor = None
     
     def create_tables(self):
         """Crée les tables de la base de données."""
         try:
             self.connect()
-            cursor = self.conn.cursor()
-
+            
+            # Table des paramètres
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
+            
             # Table des projets
-            cursor.execute("""
+            self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS projects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL UNIQUE,
-                    is_active INTEGER DEFAULT 1
+                    ticket_prefix TEXT,
+                    planner_id TEXT,  -- ID du plan Planner associé
+                    planner_name TEXT -- Nom du plan Planner
                 )
             """)
-
+            
             # Table des tickets
-            cursor.execute("""
+            self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS tickets (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     project_id INTEGER,
@@ -58,35 +70,29 @@ class Database:
                     UNIQUE(project_id, ticket_number)
                 )
             """)
-
+            
             # Table des entrées
-            cursor.execute("""
+            self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS entries (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    project_id INTEGER,
-                    ticket_id INTEGER,
-                    description TEXT NOT NULL,
-                    duration INTEGER NOT NULL,
                     date TEXT NOT NULL,
                     time TEXT NOT NULL,
-                    is_synced INTEGER DEFAULT 0,
+                    project_id INTEGER,
+                    ticket_id INTEGER,
+                    ticket_number TEXT,
                     ticket_title TEXT,
-                    todo TEXT DEFAULT NULL,
+                    description TEXT NOT NULL,
+                    todo TEXT,
+                    duration INTEGER NOT NULL,
+                    is_synced INTEGER DEFAULT 0,
+                    planner_task_id TEXT,  -- ID de la tâche Planner si synchronisée
                     FOREIGN KEY (project_id) REFERENCES projects (id),
                     FOREIGN KEY (ticket_id) REFERENCES tickets (id)
                 )
             """)
-
-            # Table des paramètres
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT
-                )
-            """)
-
+            
             # Ajout des paramètres par défaut
-            cursor.execute("""
+            self.cursor.execute("""
                 INSERT OR IGNORE INTO settings (key, value) VALUES 
                     ('jira_base_url', NULL),
                     ('jira_token', NULL),
@@ -97,7 +103,7 @@ class Database:
                     ('end_time', '18:00'),
                     ('use_sequential_time', '0')
             """)
-
+            
             self.conn.commit()
         finally:
             self.disconnect()
@@ -107,19 +113,22 @@ class Database:
         try:
             self.connect()
             
-            # Vérifie si la colonne todo existe
-            cursor = self.conn.cursor()
-            cursor.execute("PRAGMA table_info(entries)")
-            columns = [column[1] for column in cursor.fetchall()]
+            # Vérifie si la colonne planner_id existe dans la table projects
+            self.cursor.execute("PRAGMA table_info(projects)")
+            columns = [col[1] for col in self.cursor.fetchall()]
             
-            # Ajoute la colonne todo si elle n'existe pas
-            if 'todo' not in columns:
-                cursor.execute("ALTER TABLE entries ADD COLUMN todo TEXT DEFAULT NULL")
-                self.conn.commit()
-                print("Migration: Colonne 'todo' ajoutée avec succès")
+            if 'planner_id' not in columns:
+                self.cursor.execute("ALTER TABLE projects ADD COLUMN planner_id TEXT")
+                self.cursor.execute("ALTER TABLE projects ADD COLUMN planner_name TEXT")
                 
-        except Exception as e:
-            print(f"Erreur lors de la migration : {str(e)}")
+            # Vérifie si la colonne planner_task_id existe dans la table entries
+            self.cursor.execute("PRAGMA table_info(entries)")
+            columns = [col[1] for col in self.cursor.fetchall()]
+            
+            if 'planner_task_id' not in columns:
+                self.cursor.execute("ALTER TABLE entries ADD COLUMN planner_task_id TEXT")
+                
+            self.conn.commit()
         finally:
             self.disconnect()
     
@@ -135,10 +144,9 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("INSERT INTO projects (name) VALUES (?)", (name,))
+            self.cursor.execute("INSERT INTO projects (name) VALUES (?)", (name,))
             self.conn.commit()
-            return cursor.lastrowid
+            return self.cursor.lastrowid
         finally:
             self.disconnect()
     
@@ -156,13 +164,12 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("""
+            self.cursor.execute("""
                 INSERT INTO tickets (project_id, ticket_number, title)
                 VALUES (?, ?, ?)
             """, (project_id, ticket_number, title))
             self.conn.commit()
-            return cursor.lastrowid
+            return self.cursor.lastrowid
         finally:
             self.disconnect()
     
@@ -176,8 +183,7 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("UPDATE tickets SET title = ? WHERE id = ?", (title, ticket_id))
+            self.cursor.execute("UPDATE tickets SET title = ? WHERE id = ?", (title, ticket_id))
             self.conn.commit()
         finally:
             self.disconnect()
@@ -195,13 +201,12 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("""
+            self.cursor.execute("""
                 SELECT id, ticket_number, title
                 FROM tickets
                 WHERE project_id = ? AND ticket_number = ?
             """, (project_id, ticket_number))
-            return cursor.fetchone()
+            return self.cursor.fetchone()
         finally:
             self.disconnect()
     
@@ -217,14 +222,13 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("""
+            self.cursor.execute("""
                 SELECT id, ticket_number, title
                 FROM tickets
                 WHERE project_id = ?
                 ORDER BY ticket_number DESC
             """, (project_id,))
-            return cursor.fetchall()
+            return self.cursor.fetchall()
         finally:
             self.disconnect()
     
@@ -232,21 +236,20 @@ class Database:
         """Ajoute une nouvelle entrée."""
         try:
             self.connect()
-            cursor = self.conn.cursor()
-
+            
             # Si date ou heure non fournies, utilise la date et l'heure actuelles
             if not date or not time:
                 now = datetime.now()
                 date = now.strftime("%Y-%m-%d")
                 time = now.strftime("%H:%M")
-
-            cursor.execute("""
+            
+            self.cursor.execute("""
                 INSERT INTO entries (project_id, ticket_id, description, duration, date, time, ticket_title, todo)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (project_id, ticket_id, description, duration, date, time, ticket_title, todo))
             
             self.conn.commit()
-            return cursor.lastrowid
+            return self.cursor.lastrowid
         finally:
             self.disconnect()
     
@@ -254,8 +257,7 @@ class Database:
         """Récupère les entrées."""
         try:
             self.connect()
-            cursor = self.conn.cursor()
-
+            
             query = """
                 SELECT 
                     e.id,
@@ -271,15 +273,15 @@ class Database:
                 LEFT JOIN projects p ON e.project_id = p.id
                 LEFT JOIN tickets t ON e.ticket_id = t.id
             """
-
+            
             if days:
                 query += f" WHERE date >= date('now', '-{days} days')"
-
+            
             query += " ORDER BY date DESC, time DESC"
-
-            cursor.execute(query)
-            columns = [col[0] for col in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+            
+            self.cursor.execute(query)
+            columns = [col[0] for col in self.cursor.description]
+            return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
         finally:
             self.disconnect()
     
@@ -292,9 +294,8 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM projects ORDER BY name")
-            return [dict(row) for row in cursor.fetchall()]
+            self.cursor.execute("SELECT * FROM projects ORDER BY name")
+            return [dict(row) for row in self.cursor.fetchall()]
         finally:
             self.disconnect()
     
@@ -310,9 +311,8 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM tickets WHERE project_id = ?", (project_id,))
-            return [dict(row) for row in cursor.fetchall()]
+            self.cursor.execute("SELECT * FROM tickets WHERE project_id = ?", (project_id,))
+            return [dict(row) for row in self.cursor.fetchall()]
         finally:
             self.disconnect()
     
@@ -328,14 +328,13 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
             query = """
                 SELECT * FROM entries 
                 WHERE date = ?
                 ORDER BY time DESC
             """
-            cursor.execute(query, (date.isoformat(),))
-            return [dict(row) for row in cursor.fetchall()]
+            self.cursor.execute(query, (date.isoformat(),))
+            return [dict(row) for row in self.cursor.fetchall()]
         finally:
             self.disconnect()
     
@@ -352,7 +351,6 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
             query = """
                 SELECT e.*, p.name as project_name, t.ticket_number, t.title as ticket_title
                 FROM entries e
@@ -361,8 +359,8 @@ class Database:
                 WHERE date BETWEEN ? AND ?
                 ORDER BY date DESC, time DESC
             """
-            cursor.execute(query, (start_date.isoformat(), end_date.isoformat()))
-            return [dict(row) for row in cursor.fetchall()]
+            self.cursor.execute(query, (start_date.isoformat(), end_date.isoformat()))
+            return [dict(row) for row in self.cursor.fetchall()]
         finally:
             self.disconnect()
     
@@ -379,7 +377,6 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
             query = """
                 SELECT e.*, p.name as project_name, t.ticket_number, t.title as ticket_title,
                        date as entry_date
@@ -389,11 +386,11 @@ class Database:
                 WHERE date BETWEEN ? AND ?
                 ORDER BY COALESCE(p.name, ''), date DESC, time DESC
             """
-            cursor.execute(query, (start_date.isoformat(), end_date.isoformat()))
+            self.cursor.execute(query, (start_date.isoformat(), end_date.isoformat()))
             
             # Organise les résultats par projet
             entries_by_project = {}
-            for row in cursor.fetchall():
+            for row in self.cursor.fetchall():
                 entry = dict(row)
                 project_name = entry['project_name'] or 'Sans projet'
                 if project_name not in entries_by_project:
@@ -416,9 +413,8 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM projects WHERE name = ?", (name,))
-            row = cursor.fetchone()
+            self.cursor.execute("SELECT * FROM projects WHERE name = ?", (name,))
+            row = self.cursor.fetchone()
             return dict(row) if row else None
         finally:
             self.disconnect()
@@ -427,14 +423,13 @@ class Database:
         """Retourne la liste des noms de projets pour l'auto-complétion."""
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("""
+            self.cursor.execute("""
                 SELECT DISTINCT name 
                 FROM projects 
                 WHERE name IS NOT NULL 
                 ORDER BY name
             """)
-            projects = [row[0] for row in cursor.fetchall()]
+            projects = [row[0] for row in self.cursor.fetchall()]
             return projects
         except Exception as e:
             print(f"Erreur lors de la récupération des suggestions de projets : {str(e)}")
@@ -446,14 +441,13 @@ class Database:
         """Retourne la liste des numéros de tickets pour l'auto-complétion."""
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("""
+            self.cursor.execute("""
                 SELECT DISTINCT ticket_number 
                 FROM tickets 
                 WHERE ticket_number IS NOT NULL 
                 ORDER BY ticket_number
             """)
-            tickets = [row[0] for row in cursor.fetchall()]
+            tickets = [row[0] for row in self.cursor.fetchall()]
             return tickets
         except Exception as e:
             print(f"Erreur lors de la récupération des suggestions de tickets : {str(e)}")
@@ -465,8 +459,7 @@ class Database:
         """Sauvegarde un paramètre."""
         try:
             self.connect()
-            cursor = self.conn.cursor()
-            cursor.execute("""
+            self.cursor.execute("""
                 INSERT OR REPLACE INTO settings (key, value)
                 VALUES (?, ?)
             """, (key, value))
@@ -478,9 +471,8 @@ class Database:
         """Récupère un paramètre."""
         try:
             self.connect()
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
-            result = cursor.fetchone()
+            self.cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            result = self.cursor.fetchone()
             return result[0] if result else default
         finally:
             self.disconnect()
@@ -489,8 +481,7 @@ class Database:
         """Récupère les entrées non synchronisées."""
         try:
             self.connect()
-            cursor = self.conn.cursor()
-            cursor.execute("""
+            self.cursor.execute("""
                 SELECT 
                     e.id, 
                     e.date, 
@@ -509,8 +500,8 @@ class Database:
                 WHERE e.is_synced = 0
                 ORDER BY e.date DESC, e.time DESC
             """)
-            columns = [col[0] for col in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+            columns = [col[0] for col in self.cursor.description]
+            return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
         finally:
             self.disconnect()
 
@@ -518,8 +509,7 @@ class Database:
         """Marque les entrées comme synchronisées."""
         try:
             self.connect()
-            cursor = self.conn.cursor()
-            cursor.executemany("""
+            self.cursor.executemany("""
                 UPDATE entries
                 SET is_synced = 1
                 WHERE id = ?
@@ -540,7 +530,6 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
             query = """
                 SELECT t.* 
                 FROM tickets t
@@ -549,8 +538,8 @@ class Database:
                 ORDER BY e.date DESC, e.time DESC
                 LIMIT 1
             """
-            cursor.execute(query, (project_id,))
-            row = cursor.fetchone()
+            self.cursor.execute(query, (project_id,))
+            row = self.cursor.fetchone()
             
             if row:
                 return {
@@ -581,7 +570,6 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
             query = """
                 SELECT DISTINCT t.ticket_number, t.title, COALESCE(t.is_active, 1) as is_active
                 FROM tickets t
@@ -594,8 +582,8 @@ class Database:
                 GROUP BY t.ticket_number
                 ORDER BY MAX(e.date || ' ' || e.time) DESC NULLS LAST
             """
-            cursor.execute(query, (project_id,))
-            return [{'ticket_number': row['ticket_number'], 'title': row['title'], 'is_active': row['is_active']} for row in cursor.fetchall()]
+            self.cursor.execute(query, (project_id,))
+            return [{'ticket_number': row['ticket_number'], 'title': row['title'], 'is_active': row['is_active']} for row in self.cursor.fetchall()]
         finally:
             self.disconnect()
 
@@ -611,15 +599,14 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
             query = "SELECT id, name, is_active FROM projects"
             if not include_inactive:
                 query += " WHERE is_active = 1"
             query += " ORDER BY name"
             
-            cursor.execute(query)
+            self.cursor.execute(query)
             projects = []
-            for row in cursor.fetchall():
+            for row in self.cursor.fetchall():
                 project = {
                     'id': row['id'],
                     'name': row['name'],
@@ -641,8 +628,7 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(
+            self.cursor.execute(
                 "UPDATE projects SET is_active = ? WHERE id = ?",
                 (1 if is_active else 0, project_id)
             )
@@ -661,8 +647,7 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(
+            self.cursor.execute(
                 "UPDATE tickets SET is_active = ? WHERE project_id = ? AND ticket_number = ?",
                 (1 if is_active else 0, project_id, ticket_number)
             )
@@ -674,9 +659,8 @@ class Database:
         """Récupère une entrée par son ID."""
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM entries WHERE id = ?", (entry_id,))
-            row = cursor.fetchone()
+            self.cursor.execute("SELECT * FROM entries WHERE id = ?", (entry_id,))
+            row = self.cursor.fetchone()
             return dict(row) if row else None
         finally:
             self.disconnect()
@@ -693,13 +677,12 @@ class Database:
         """
         self.connect()
         try:
-            cursor = self.conn.cursor()
-            cursor.execute("""
+            self.cursor.execute("""
                 SELECT SUM(duration) as total_minutes
                 FROM entries
                 WHERE date = ?
             """, (date,))
-            result = cursor.fetchone()
+            result = self.cursor.fetchone()
             return result['total_minutes'] or 0
         finally:
             self.disconnect()
@@ -742,9 +725,8 @@ class Database:
             LIMIT 1
         """
         self.connect()
-        cursor = self.conn.cursor()
-        cursor.execute(query, (date,))
-        last_entry = cursor.fetchone()
+        self.cursor.execute(query, (date,))
+        last_entry = self.cursor.fetchone()
         
         if not last_entry:
             # Si pas d'événement ce jour, utilise l'heure de début configurée

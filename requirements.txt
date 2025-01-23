@@ -16,3 +16,5 @@ loguru>=0.7.0  # Pour la gestion avancée des logs
 
 # Build
 pyinstaller>=6.3.0  # Pour la création d'exécutables
+
+msal>=1.31.1
