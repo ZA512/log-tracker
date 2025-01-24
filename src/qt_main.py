@@ -278,84 +278,37 @@ class LogTrackerApp(QMainWindow):
         self.update_summary()
 
     def check_alerts(self):
-        """Vérifie les conditions d'alerte et met à jour l'interface."""
-        current_time = datetime.now().time()
-        current_date = datetime.now().date()
-
-        # Réinitialisation quotidienne
-        if self.last_entry_time and self.last_entry_time.date() != current_date:
-            self.last_entry_time = None
-            self.total_duration = 0
-
-        # Vérifie si on est dans les heures de travail
-        if current_time < self.start_time or current_time > self.end_time:
-            self.set_background_color("black")
-            return
-
-        # Calcul du temps d'inactivité
-        if self.last_entry_time:
-            inactive_time = datetime.now() - self.last_entry_time
-            inactive_hours = inactive_time.total_seconds() / 3600
-
-            if inactive_hours >= 2:
-                self.set_background_color("darkred")
-            elif inactive_hours >= 1:
-                self.set_background_color("darkorange")
-            else:
-                self.set_background_color("black")
-        else:
-            # Si aucune entrée aujourd'hui et dans les heures de travail
-            self.set_background_color("darkorange")
-
-        # Alerte de fin de journée
-        end_datetime = datetime.combine(current_date, self.end_time)
-        time_left = end_datetime - datetime.now()
-        if time_left.total_seconds() <= 1800 and self.total_duration < self.daily_hours * 60:  # 30 minutes
-            self.set_background_color("darkred")
-
-    def set_background_color(self, color):
-        """Change la couleur de fond de la fenêtre."""
+        """Vérifie les alertes et met à jour l'interface en conséquence."""
         try:
-            base_style = """
-                QWidget {
-                    background-color: %s;
-                    color: #d0d0d1;
-                }
-                QToolButton {
-                    border: none;
-                    padding: 5px;
-                    color: #d0d0d1;
-                    background: transparent;
-                }
-                QToolButton:hover {
-                    background-color: #333333;
-                    border-radius: 3px;
-                }
-                QLabel {
-                    color: #d0d0d1;
-                    font-size: 13px;
-                    background: transparent;
-                }
-                QFrame[frameShape="4"] {  /* HLine */
-                    background-color: #333333;
-                    max-height: 1px;
-                    border: none;
-                }
-            """
+            # Récupère le total des minutes pour aujourd'hui
+            total_minutes = self.db.get_total_minutes_for_day(datetime.now().date().isoformat())
             
-            if color == "black":
-                bg_color = "#1e1e1e"
-            elif color == "darkorange":
-                bg_color = "#D2691E"  # Plus foncé que FF8C00
-            elif color == "darkred":
-                bg_color = "#8B0000"
-            else:
-                bg_color = "#1e1e1e"
-                
-            self.setStyleSheet(base_style % bg_color)
+            # Met à jour le total
+            self.total_duration = total_minutes
+            
+            # Vérifie si on est dans les heures de travail
+            now = datetime.now().time()
+            start_time = datetime.strptime(self.db.get_setting('start_time', '08:30'), '%H:%M').time()
+            end_time = datetime.strptime(self.db.get_setting('end_time', '18:00'), '%H:%M').time()
+            
+            # Si on est en dehors des heures de travail, pas d'alerte
+            if now < start_time or now > end_time:
+                return
+            
+            # Vérifie si on a atteint le nombre d'heures requis
+            hours_per_day = float(self.db.get_setting('hours_per_day', '7'))
+            minutes_per_day = hours_per_day * 60
+            
+            # Si on a dépassé le nombre d'heures requis, pas d'alerte
+            if total_minutes >= minutes_per_day:
+                return
+            
+            # Vérifie l'état des entrées et met à jour la barre de statut
+            self.check_entry_status()
                 
         except Exception as e:
-            print(f"Erreur lors du changement de couleur : {str(e)}")
+            print(f"Erreur lors de la vérification des alertes : {str(e)}")
+            self.check_entry_status()
 
     def update_summary(self):
         """Met à jour le résumé des entrées."""
@@ -412,11 +365,17 @@ class LogTrackerApp(QMainWindow):
                     background-color: #FF9800;
                     color: white;
                 }
+                QSizeGrip {
+                    background-color: #FF9800;
+                }
             """,
             "danger": """
                 QStatusBar {
                     background-color: #F44336;
                     color: white;
+                }
+                QSizeGrip {
+                    background-color: #F44336;
                 }
             """
         }
@@ -450,9 +409,8 @@ class LogTrackerApp(QMainWindow):
             
             # Calcule la date/heure de fin de la dernière entrée
             entry_datetime = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
-            print("entry_datetime", entry_datetime)
             end_datetime = entry_datetime + timedelta(minutes=last_entry['duration'])
-            print("end_datetime", end_datetime)
+
             
             # Calcule la différence entre maintenant et la fin de la dernière entrée
             time_diff = now - end_datetime
