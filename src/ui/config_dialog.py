@@ -81,6 +81,10 @@ class ConfigDialog(QDialog):
         self.tenant_id = QLineEdit()
         ms_layout.addRow("Tenant ID:", self.tenant_id)
         
+        self.ms_token = QLineEdit()
+        self.ms_token.setEchoMode(QLineEdit.EchoMode.Password)
+        ms_layout.addRow("Token MSAL:", self.ms_token)
+        
         self.ms_connect_btn = QPushButton("Se connecter à Microsoft")
         ms_layout.addRow(self.ms_connect_btn)
         
@@ -130,6 +134,7 @@ class ConfigDialog(QDialog):
             # Paramètres Microsoft
             self.client_id.setText(self.db.get_setting('ms_client_id', ''))
             self.tenant_id.setText(self.db.get_setting('ms_tenant_id', ''))
+            self.ms_token.setText(self.db.get_setting('ms_token', ''))
             
             # Si les IDs sont renseignés, charge les plans
             if self.client_id.text() and self.tenant_id.text():
@@ -152,28 +157,29 @@ class ConfigDialog(QDialog):
             QMessageBox.warning(self, "Erreur", f"Erreur lors du chargement de la configuration : {str(e)}")
 
     def save_config(self):
-        """Sauvegarde la configuration dans la base de données."""
+        """Enregistre la configuration dans la base de données."""
         try:
-            # Paramètres généraux
+            # Enregistre dans la base de données
             self.db.save_setting('start_time', self.start_time.time().toString("HH:mm"))
             self.db.save_setting('end_time', self.end_time.time().toString("HH:mm"))
             self.db.save_setting('hours_per_day', self.hours_per_day.text())
             self.db.save_setting('use_sequential_time', "1" if self.use_sequential_time.isChecked() else "0")
             
             # Paramètres Jira
-            self.db.save_setting('jira_base_url', self.jira_url.text().strip())
-            self.db.save_setting('jira_email', self.jira_email.text().strip())
-            self.db.save_setting('jira_token', self.jira_token.text().strip())
-            self.db.save_setting('token_expiry', self.token_expiry.text().strip())
+            self.db.save_setting('jira_base_url', self.jira_url.text())
+            self.db.save_setting('jira_email', self.jira_email.text())
+            self.db.save_setting('jira_token', self.jira_token.text())
+            self.db.save_setting('token_expiry', self.token_expiry.text())
             
             # Paramètres Microsoft
-            self.db.save_setting('ms_client_id', self.client_id.text().strip())
-            self.db.save_setting('ms_tenant_id', self.tenant_id.text().strip())
+            self.db.save_setting('ms_client_id', self.client_id.text())
+            self.db.save_setting('ms_tenant_id', self.tenant_id.text())
+            self.db.save_setting('ms_token', self.ms_token.text())
             
-            # Plan sélectionné
             if self.planner_combo.currentData():
                 self.db.save_setting('ms_plan_id', self.planner_combo.currentData())
             
             self.accept()
+            QMessageBox.information(self, "Succès", "Configuration enregistrée avec succès!")
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enregistrement : {str(e)}")
