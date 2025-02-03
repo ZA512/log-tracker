@@ -4,14 +4,14 @@
 import sys
 from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QLineEdit, QTextEdit, QTreeWidget, QTreeWidgetItem,
     QFrame, QSpinBox, QComboBox, QRadioButton, QButtonGroup, QGroupBox,
     QSplitter, QDialog, QFormLayout, QStyle, QToolButton, QDialogButtonBox, QMessageBox,
-    QDateEdit, QTimeEdit, QStatusBar
+    QDateEdit, QTimeEdit, QStatusBar, QMenuBar, QApplication
 )
 from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime
-from PyQt6.QtGui import QFont, QIcon, QPainter, QColor, QPalette
+from PyQt6.QtGui import QFont, QIcon, QPainter, QColor, QPalette, QAction
 import os
 import json
 
@@ -22,8 +22,10 @@ from ui.project_combo import ProjectComboBox
 from ui.config_dialog import ConfigDialog
 from ui.sync_dialog import SyncDialog
 from ui.entry_dialog import EntryDialog
+from ui.entry_dialog_v2 import EntryDialogV2
 from ui.entries_dialog import EntriesDialog
 from ui.projects_dialog import ProjectsDialog
+from ui.theme import Theme, DEFAULT_THEME, DARK_THEME
 
 class LogTrackerApp(QMainWindow):
     """Fenêtre principale de l'application."""
@@ -60,17 +62,16 @@ class LogTrackerApp(QMainWindow):
 
     def load_config(self):
         """Charge la configuration."""
-        config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
-        if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-                self.start_time = datetime.strptime(config.get('start_time', '08:00'), '%H:%M').time()
-                self.end_time = datetime.strptime(config.get('end_time', '18:00'), '%H:%M').time()
-                self.daily_hours = int(self.db.get_setting('daily_hours', '8'))
-        else:
-            self.start_time = datetime.strptime('08:00', '%H:%M').time()
-            self.end_time = datetime.strptime('18:00', '%H:%M').time()
-            self.daily_hours = 8
+        # Charge le thème
+        theme_name = self.db.get_setting('theme', 'dark')
+        self.current_theme = Theme(theme_name)
+        self.setStyleSheet(self.current_theme.get_stylesheet())
+        
+        # Charge les autres paramètres
+        self.start_time = self.db.get_setting('start_time', "09:00")
+        self.end_time = self.db.get_setting('end_time', "17:00")
+        self.hours_per_day = float(self.db.get_setting('hours_per_day', "8"))
+        self.daily_hours = int(self.db.get_setting('daily_hours', '8'))
 
     def load_svg_icon(self, filename):
         """Charge une icône SVG depuis le dossier resources."""
@@ -102,41 +103,41 @@ class LogTrackerApp(QMainWindow):
     def setup_ui(self):
         """Configure l'interface utilisateur."""
         self.setWindowTitle("Log Tracker")
-        self.resize(300, 100)
+        self.resize(233, 90)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         
         # Définir l'icône de la fenêtre
         window_icon = self.load_svg_icon("calendar-days.svg")
         self.setWindowIcon(window_icon)
         
-        self.setStyleSheet("""\
-            QMainWindow {
-                background-color: #1e1e1e;
-            }
-            QWidget {
-                background-color: #1e1e1e;
-                color: #d0d0d1;
-            }
-            QToolButton {
-                border: none;
-                padding: 5px;
-                color: #d0d0d1;
-            }
-            QToolButton:hover {
-                background-color: #333333;
-                border-radius: 3px;
-            }
-            QLabel {
-                color: #d0d0d1;
-                font-size: 13px;
-                background: transparent;
-            }
-            QFrame[frameShape="4"] {  /* HLine */
-                background-color: #333333;
-                max-height: 1px;
-                border: none;
-            }
-        """)
+        # self.setStyleSheet("""\
+        #     QMainWindow {
+        #         background-color: #1e1e1e;
+        #     }
+        #     QWidget {
+        #         background-color: #1e1e1e;
+        #         color: #d0d0d1;
+        #     }
+        #     QToolButton {
+        #         border: none;
+        #         padding: 5px;
+        #         color: #d0d0d1;
+        #     }
+        #     QToolButton:hover {
+        #         background-color: #333333;
+        #         border-radius: 3px;
+        #     }
+        #     QLabel {
+        #         color: #d0d0d1;
+        #         font-size: 13px;
+        #         background: transparent;
+        #     }
+        #     QFrame[frameShape="4"] {  /* HLine */
+        #         background-color: #333333;
+        #         max-height: 1px;
+        #         border: none;
+        #     }
+        # """)
 
         # Widget central
         central_widget = QWidget()
@@ -165,7 +166,7 @@ class LogTrackerApp(QMainWindow):
             return button
 
         # Création des boutons avec les icônes colorées
-        add_button = create_tool_button('plus.svg', "Ajouter une entrée", self.show_entry_dialog)
+        add_button = create_tool_button('plus.svg', "Ajouter une entrée", self.on_add_clicked)
         list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
         self.sync_button = create_tool_button('refresh.svg', "Synchroniser vers jira", self.show_sync_dialog)
         config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
@@ -258,6 +259,7 @@ class LogTrackerApp(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("")
+
 
     def update_sync_button_state(self):
         """Met à jour l'état du bouton de synchronisation en fonction de la configuration Jira."""
@@ -433,6 +435,14 @@ class LogTrackerApp(QMainWindow):
         # Vérifie à nouveau dans 5 minutes
         QTimer.singleShot(5 * 60 * 1000, self.check_entry_status)
         
+    def on_add_clicked(self):
+        """Ouvre la fenêtre de saisie appropriée selon le paramètre."""
+        entry_type = self.db.get_setting('entry_screen_type', 'time_only')
+        if entry_type == 'time_and_todo':
+            self.show_entry_dialog_v2()
+        else:
+            self.show_entry_dialog()
+
     def show_entry_dialog(self):
         """Affiche la fenêtre de saisie."""
         if self.entry_dialog is not None:
@@ -498,6 +508,13 @@ class LogTrackerApp(QMainWindow):
 
         except Exception as e:
             print(f"Erreur lors de la vérification de la dernière entrée : {str(e)}")
+
+    def show_entry_dialog_v2(self):
+        """Affiche la nouvelle version de la fenêtre de saisie."""
+        if not self.entry_dialog or not self.entry_dialog.isVisible():
+            self.entry_dialog = EntryDialogV2(self, self.db, self.current_theme)
+        self.entry_dialog.show()
+        self.entry_dialog.activateWindow()
 
 
 def main():
