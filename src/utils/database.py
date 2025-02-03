@@ -91,6 +91,46 @@ class Database:
                 )
             """)
             
+            # Table des Epics
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS epics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    project_id INTEGER,
+                    visible INTEGER DEFAULT 1,
+                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id)
+                )
+            """)
+            
+            # Table des Fonctionnalités
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS features (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    project_id INTEGER,
+                    visible INTEGER DEFAULT 1,
+                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id)
+                )
+            """)
+            
+            # Table des paires Epic/Fonctionnalité
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS epic_feature_pairs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    epic_id INTEGER,
+                    feature_id INTEGER,
+                    project_id INTEGER,
+                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (epic_id) REFERENCES epics(id),
+                    FOREIGN KEY (feature_id) REFERENCES features(id),
+                    FOREIGN KEY (project_id) REFERENCES projects(id)
+                )
+            """)
+            
             # Ajout des paramètres par défaut
             self.cursor.execute("""
                 INSERT OR IGNORE INTO settings (key, value) VALUES 
@@ -749,3 +789,139 @@ class Database:
             return "23:59"
             
         return f"{new_hours:02d}:{new_minutes:02d}"
+
+    def get_recent_epic_feature_pairs(self, project_name, limit=10):
+        """Récupère les paires Epic/Fonctionnalité récemment utilisées pour un projet.
+        
+        Args:
+            project_name (str): Nom du projet
+            limit (int): Nombre maximum de paires à retourner
+            
+        Returns:
+            List[Tuple[str, str, str, str]]: Liste de tuples (epic_key, epic_name, feature_key, feature_name)
+        """
+        query = """
+            SELECT e.key, e.name, f.key, f.name
+            FROM epic_feature_pairs p
+            JOIN epics e ON e.id = p.epic_id
+            JOIN features f ON f.id = p.feature_id
+            JOIN projects pr ON pr.id = p.project_id
+            WHERE pr.name = ? AND e.visible = 1 AND f.visible = 1
+            ORDER BY p.last_used DESC
+            LIMIT ?
+        """
+        self.connect()
+        self.cursor.execute(query, (project_name, limit))
+        return self.cursor.fetchall()
+
+    def add_epic(self, key, name, project_name):
+        """Ajoute ou met à jour un epic.
+        
+        Args:
+            key (str): Clé Jira de l'epic
+            name (str): Nom de l'epic
+            project_name (str): Nom du projet
+        """
+        project_id = self.get_project_id(project_name)
+        if project_id:
+            self.connect()
+            self.cursor.execute("""
+                INSERT OR REPLACE INTO epics (key, name, project_id, last_used)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """, (key, name, project_id))
+            self.conn.commit()
+            self.disconnect()
+
+    def add_feature(self, key, name, project_name):
+        """Ajoute ou met à jour une fonctionnalité.
+        
+        Args:
+            key (str): Clé Jira de la fonctionnalité
+            name (str): Nom de la fonctionnalité
+            project_name (str): Nom du projet
+        """
+        project_id = self.get_project_id(project_name)
+        if project_id:
+            self.connect()
+            self.cursor.execute("""
+                INSERT OR REPLACE INTO features (key, name, project_id, last_used)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """, (key, name, project_id))
+            self.conn.commit()
+            self.disconnect()
+
+    def add_epic_feature_pair(self, epic_key, feature_key, project_name):
+        """Ajoute ou met à jour une paire Epic/Fonctionnalité.
+        
+        Args:
+            epic_key (str): Clé Jira de l'epic
+            feature_key (str): Clé Jira de la fonctionnalité
+            project_name (str): Nom du projet
+        """
+        project_id = self.get_project_id(project_name)
+        if project_id:
+            # Récupérer les IDs des epic et feature
+            epic_id = self.cursor.execute(
+                "SELECT id FROM epics WHERE key = ? AND project_id = ?",
+                (epic_key, project_id)
+            ).fetchone()[0]
+            
+            feature_id = self.cursor.execute(
+                "SELECT id FROM features WHERE key = ? AND project_id = ?",
+                (feature_key, project_id)
+            ).fetchone()[0]
+            
+            self.connect()
+            self.cursor.execute("""
+                INSERT OR REPLACE INTO epic_feature_pairs (epic_id, feature_id, project_id, last_used)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """, (epic_id, feature_id, project_id))
+            self.conn.commit()
+            self.disconnect()
+
+    def set_epic_visibility(self, epic_key, project_name, visible):
+        """Change la visibilité d'un epic.
+        
+        Args:
+            epic_key (str): Clé Jira de l'epic
+            project_name (str): Nom du projet
+            visible (bool): True pour rendre visible, False pour cacher
+        """
+        project_id = self.get_project_id(project_name)
+        if project_id:
+            self.connect()
+            self.cursor.execute("""
+                UPDATE epics
+                SET visible = ?
+                WHERE key = ? AND project_id = ?
+            """, (1 if visible else 0, epic_key, project_id))
+            self.conn.commit()
+            self.disconnect()
+
+    def set_feature_visibility(self, feature_key, project_name, visible):
+        """Change la visibilité d'une fonctionnalité.
+        
+        Args:
+            feature_key (str): Clé Jira de la fonctionnalité
+            project_name (str): Nom du projet
+            visible (bool): True pour rendre visible, False pour cacher
+        """
+        project_id = self.get_project_id(project_name)
+        if project_id:
+            self.connect()
+            self.cursor.execute("""
+                UPDATE features
+                SET visible = ?
+                WHERE key = ? AND project_id = ?
+            """, (1 if visible else 0, feature_key, project_id))
+            self.conn.commit()
+            self.disconnect()
+
+    def get_project_id(self, project_name):
+        """Récupère l'ID d'un projet par son nom."""
+        self.connect()
+        self.cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
+        row = self.cursor.fetchone()
+        project_id = row[0] if row else None
+        self.disconnect()
+        return project_id

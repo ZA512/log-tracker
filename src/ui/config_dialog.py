@@ -10,7 +10,7 @@ from PyQt6.QtCore import QTime
 import os
 import json
 from utils.database import Database
-from utils.ms_graph_client import MSGraphClient
+from ui.theme import Theme
 
 class ConfigDialog(QDialog):
     """Fenêtre de configuration pour les paramètres de l'application."""
@@ -18,7 +18,6 @@ class ConfigDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.db = Database()
-        self.ms_client = None
         self.init_ui()
         self.load_config()
         self.resize(400, 500)
@@ -47,139 +46,104 @@ class ConfigDialog(QDialog):
         self.use_sequential_time = QCheckBox("Utiliser l'heure séquentielle")
         general_layout.addRow(self.use_sequential_time)
         
+        # Sélecteur de thème
+        self.theme_combo = QComboBox()
+        themes = Theme.get_available_themes()
+        for theme_name in themes.keys():
+            self.theme_combo.addItem(theme_name)
+        current_theme = self.db.get_setting('theme', 'dark')
+        index = self.theme_combo.findText(current_theme)
+        if index >= 0:
+            self.theme_combo.setCurrentIndex(index)
+        general_layout.addRow("Thème:", self.theme_combo)
+        
+        # Sélecteur du type d'écran de saisie
+        self.entry_type_combo = QComboBox()
+        self.entry_type_combo.addItem("Saisir du temps", "time_only")
+        self.entry_type_combo.addItem("Saisir temps et tâche à faire", "time_and_todo")
+        current_entry_type = self.db.get_setting('entry_screen_type', 'time_only')
+        index = self.entry_type_combo.findData(current_entry_type)
+        if index >= 0:
+            self.entry_type_combo.setCurrentIndex(index)
+        general_layout.addRow("Type d'écran de saisie:", self.entry_type_combo)
+        
         general_group.setLayout(general_layout)
         layout.addWidget(general_group)
         
-        # Groupe Configuration Jira
+        # Groupe Jira
         jira_group = QGroupBox("Configuration Jira")
         jira_layout = QFormLayout()
         
         self.jira_url = QLineEdit()
+        self.jira_url.setPlaceholderText("https://your-domain.atlassian.net")
         jira_layout.addRow("URL Jira:", self.jira_url)
         
-        self.jira_email = QLineEdit()
-        jira_layout.addRow("Email:", self.jira_email)
-        
         self.jira_token = QLineEdit()
+        self.jira_token.setPlaceholderText("Votre token Jira")
         self.jira_token.setEchoMode(QLineEdit.EchoMode.Password)
-        jira_layout.addRow("Token API:", self.jira_token)
+        jira_layout.addRow("Token Jira:", self.jira_token)
         
-        self.token_expiry = QLineEdit()
-        self.token_expiry.setPlaceholderText("JJ/MM/AAAA")
-        jira_layout.addRow("Date d'expiration du token:", self.token_expiry)
+        self.jira_user = QLineEdit()
+        self.jira_user.setPlaceholderText("prenom.nom@email.com")
+        jira_layout.addRow("Utilisateur Jira:", self.jira_user)
         
         jira_group.setLayout(jira_layout)
         layout.addWidget(jira_group)
         
-        # Groupe Configuration Microsoft
-        ms_group = QGroupBox("Configuration Microsoft")
-        ms_layout = QFormLayout()
-        
-        self.client_id = QLineEdit()
-        ms_layout.addRow("Client ID:", self.client_id)
-        
-        self.tenant_id = QLineEdit()
-        ms_layout.addRow("Tenant ID:", self.tenant_id)
-        
-        self.ms_token = QLineEdit()
-        self.ms_token.setEchoMode(QLineEdit.EchoMode.Password)
-        ms_layout.addRow("Token MSAL:", self.ms_token)
-        
-        self.ms_connect_btn = QPushButton("Se connecter à Microsoft")
-        ms_layout.addRow(self.ms_connect_btn)
-        
-        self.planner_combo = QComboBox()
-        self.planner_combo.setEnabled(False)
-        ms_layout.addRow("Plan Planner:", self.planner_combo)
-        
-        ms_group.setLayout(ms_layout)
-        layout.addWidget(ms_group)
-        
         # Boutons
-        button_layout = QHBoxLayout()
-        self.save_button = QPushButton("Enregistrer")
-        self.save_button.clicked.connect(self.save_config)
+        buttons_layout = QHBoxLayout()
+        
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.save_config)
+        
         self.cancel_button = QPushButton("Annuler")
         self.cancel_button.clicked.connect(self.reject)
         
-        button_layout.addWidget(self.save_button)
-        button_layout.addWidget(self.cancel_button)
-        layout.addLayout(button_layout)
+        buttons_layout.addWidget(self.ok_button)
+        buttons_layout.addWidget(self.cancel_button)
         
+        layout.addLayout(buttons_layout)
         self.setLayout(layout)
-        self.setWindowTitle("Configuration")
 
     def load_config(self):
         """Charge la configuration depuis la base de données."""
-        try:
-            # Charge depuis la base de données
-            start_time = self.db.get_setting('start_time', "08:30")
-            self.start_time.setTime(QTime.fromString(start_time, "HH:mm"))
-            
-            end_time = self.db.get_setting('end_time', "18:00")
-            self.end_time.setTime(QTime.fromString(end_time, "HH:mm"))
-            
-            hours_per_day = self.db.get_setting('hours_per_day', "8")
-            self.hours_per_day.setText(hours_per_day)
-            
-            use_sequential = self.db.get_setting('use_sequential_time', "0")
-            self.use_sequential_time.setChecked(use_sequential == "1")
-            
-            # Paramètres Jira
-            self.jira_url.setText(self.db.get_setting('jira_base_url', ''))
-            self.jira_email.setText(self.db.get_setting('jira_email', ''))
-            self.jira_token.setText(self.db.get_setting('jira_token', ''))
-            self.token_expiry.setText(self.db.get_setting('token_expiry', ''))
-            
-            # Paramètres Microsoft
-            self.client_id.setText(self.db.get_setting('ms_client_id', ''))
-            self.tenant_id.setText(self.db.get_setting('ms_tenant_id', ''))
-            self.ms_token.setText(self.db.get_setting('ms_token', ''))
-            
-            # Si les IDs sont renseignés, charge les plans
-            if self.client_id.text() and self.tenant_id.text():
-                self.ms_client = MSGraphClient(self.client_id.text(), self.tenant_id.text())
-                plans = self.ms_client.get_plans()
-                if plans:
-                    self.planner_combo.clear()
-                    for plan in plans:
-                        display_text = f"{plan['title']} ({plan['group_name']})"
-                        self.planner_combo.addItem(display_text, plan['id'])
-                    
-                    saved_plan_id = self.db.get_setting('ms_plan_id')
-                    if saved_plan_id:
-                        index = self.planner_combo.findData(saved_plan_id)
-                        if index >= 0:
-                            self.planner_combo.setCurrentIndex(index)
-                    self.planner_combo.setEnabled(True)
-                
-        except Exception as e:
-            QMessageBox.warning(self, "Erreur", f"Erreur lors du chargement de la configuration : {str(e)}")
+        # Paramètres généraux
+        start_time = self.db.get_setting('start_time', '09:00')
+        self.start_time.setTime(QTime.fromString(start_time, "HH:mm"))
+        
+        end_time = self.db.get_setting('end_time', '17:00')
+        self.end_time.setTime(QTime.fromString(end_time, "HH:mm"))
+        
+        hours = self.db.get_setting('hours_per_day', '8')
+        self.hours_per_day.setText(hours)
+        
+        use_sequential = self.db.get_setting('use_sequential_time', '0')
+        self.use_sequential_time.setChecked(use_sequential == '1')
+        
+        # Configuration Jira
+        config = self.db.get_jira_config()
+        self.jira_url.setText(config.get('jira_base_url', ''))
+        self.jira_token.setText(config.get('jira_token', ''))
+        self.jira_user.setText(config.get('jira_user', ''))
 
     def save_config(self):
         """Enregistre la configuration dans la base de données."""
         try:
-            # Enregistre dans la base de données
+            # Paramètres généraux
             self.db.save_setting('start_time', self.start_time.time().toString("HH:mm"))
             self.db.save_setting('end_time', self.end_time.time().toString("HH:mm"))
             self.db.save_setting('hours_per_day', self.hours_per_day.text())
-            self.db.save_setting('use_sequential_time', "1" if self.use_sequential_time.isChecked() else "0")
+            self.db.save_setting('use_sequential_time', '1' if self.use_sequential_time.isChecked() else '0')
+            self.db.save_setting('theme', self.theme_combo.currentText())
+            self.db.save_setting('entry_screen_type', self.entry_type_combo.currentData())
             
-            # Paramètres Jira
+            # Configuration Jira
             self.db.save_setting('jira_base_url', self.jira_url.text())
-            self.db.save_setting('jira_email', self.jira_email.text())
             self.db.save_setting('jira_token', self.jira_token.text())
-            self.db.save_setting('token_expiry', self.token_expiry.text())
+            self.db.save_setting('jira_user', self.jira_user.text())
             
-            # Paramètres Microsoft
-            self.db.save_setting('ms_client_id', self.client_id.text())
-            self.db.save_setting('ms_tenant_id', self.tenant_id.text())
-            self.db.save_setting('ms_token', self.ms_token.text())
-            
-            if self.planner_combo.currentData():
-                self.db.save_setting('ms_plan_id', self.planner_combo.currentData())
-            
+            QMessageBox.information(self, "Succès", "Configuration enregistrée avec succès")
             self.accept()
-            QMessageBox.information(self, "Succès", "Configuration enregistrée avec succès!")
+            
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enregistrement : {str(e)}")
