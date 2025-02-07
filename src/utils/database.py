@@ -91,45 +91,35 @@ class Database:
                 )
             """)
             
-            # Table des Epics
+            # Suppression des anciennes tables
+            self.cursor.execute("DROP TABLE IF EXISTS jira_hierarchy")
+            self.cursor.execute("DROP TABLE IF EXISTS epic_feature_pairs")
+            self.cursor.execute("DROP TABLE IF EXISTS features")
+            self.cursor.execute("DROP TABLE IF EXISTS epics")
+            
+            # Création des nouvelles tables simplifiées
             self.cursor.execute("""
-                CREATE TABLE IF NOT EXISTS epics (
+                CREATE TABLE IF NOT EXISTS jira_paths (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    project_id INTEGER,
-                    visible INTEGER DEFAULT 1,
-                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (project_id) REFERENCES projects(id)
+                    path TEXT NOT NULL,  -- Format: "projet/epic/fonctionnalité"
+                    ticket_key TEXT NOT NULL,  -- Numéro du ticket Jira
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
-            # Table des Fonctionnalités
             self.cursor.execute("""
-                CREATE TABLE IF NOT EXISTS features (
+                CREATE TABLE IF NOT EXISTS jira_subtasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    project_id INTEGER,
-                    visible INTEGER DEFAULT 1,
-                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (project_id) REFERENCES projects(id)
+                    path TEXT NOT NULL,  -- Format: "projet/epic/fonctionnalité"
+                    title TEXT NOT NULL,  -- Titre du ticket
+                    ticket_key TEXT NOT NULL,  -- Numéro du ticket Jira
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
-            # Table des paires Epic/Fonctionnalité
-            self.cursor.execute("""
-                CREATE TABLE IF NOT EXISTS epic_feature_pairs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    epic_id INTEGER,
-                    feature_id INTEGER,
-                    project_id INTEGER,
-                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (epic_id) REFERENCES epics(id),
-                    FOREIGN KEY (feature_id) REFERENCES features(id),
-                    FOREIGN KEY (project_id) REFERENCES projects(id)
-                )
-            """)
+            # Création des index pour optimiser les recherches
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_jira_paths_path ON jira_paths(path)")
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_jira_subtasks_path ON jira_subtasks(path)")
             
             # Ajout des paramètres par défaut
             self.cursor.execute("""
@@ -141,10 +131,13 @@ class Database:
                     ('token_expiry', NULL),
                     ('start_time', '08:00'),
                     ('end_time', '18:00'),
-                    ('use_sequential_time', '0')
+                    ('use_sequential_time', '0'),
+                    ('ticket_selection_jql', NULL),
+                    ('project_selection_jql', NULL)
             """)
             
             self.conn.commit()
+            
         finally:
             self.disconnect()
     
