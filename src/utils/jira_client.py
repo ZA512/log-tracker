@@ -49,6 +49,11 @@ class JiraClient:
                 f"{self.base_url}/rest/api/3/issue/{issue_key}",
                 headers=self.headers
             )
+            
+            # Si le ticket n'existe pas, on retourne silencieusement None
+            if response.status_code == 404:
+                return None
+                
             response.raise_for_status()
             data = response.json()
             
@@ -59,7 +64,8 @@ class JiraClient:
             }
         except Exception as e:
             if isinstance(e, requests.exceptions.RequestException):
-                print(f"Erreur API Jira pour {issue_key} - Status: {e.response.status_code}, Response: {e.response.text}")
+                if e.response.status_code != 404:  # On n'affiche pas les erreurs 404
+                    print(f"Erreur API Jira pour {issue_key} - Status: {e.response.status_code}, Response: {e.response.text}")
             else:
                 print(f"Erreur lors de la récupération du ticket {issue_key}: {str(e)}")
             return None

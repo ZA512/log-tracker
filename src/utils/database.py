@@ -82,7 +82,6 @@ class Database:
                     ticket_number TEXT,
                     ticket_title TEXT,
                     description TEXT NOT NULL,
-                    todo TEXT,
                     duration INTEGER NOT NULL,
                     is_synced INTEGER DEFAULT 0,
                     planner_task_id TEXT,  -- ID de la tâche Planner si synchronisée
@@ -265,22 +264,21 @@ class Database:
         finally:
             self.disconnect()
     
-    def add_entry(self, description, project_id=None, ticket_id=None, duration=60, ticket_title=None, date=None, time=None, todo=None):
+    def add_entry(self, description, project_id=None, ticket_id=None, duration=60, ticket_title=None, date=None, time=None):
         """Ajoute une nouvelle entrée."""
+        self.connect()
         try:
-            self.connect()
-            
-            # Si date ou heure non fournies, utilise la date et l'heure actuelles
-            if not date or not time:
-                now = datetime.now()
-                date = now.strftime("%Y-%m-%d")
-                time = now.strftime("%H:%M")
-            
             self.cursor.execute("""
-                INSERT INTO entries (project_id, ticket_id, description, duration, date, time, ticket_title, todo)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (project_id, ticket_id, description, duration, date, time, ticket_title, todo))
-            
+                INSERT INTO entries (
+                    date, time, project_id, ticket_id, ticket_title,
+                    description, duration
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                date or datetime.now().strftime("%Y-%m-%d"),
+                time or datetime.now().strftime("%H:%M"),
+                project_id, ticket_id, ticket_title,
+                description, duration
+            ))
             self.conn.commit()
             return self.cursor.lastrowid
         finally:
@@ -299,7 +297,6 @@ class Database:
                     e.date,
                     e.time,
                     e.ticket_title,
-                    e.todo,
                     p.name as project_name,
                     t.ticket_number
                 FROM entries e
@@ -524,7 +521,6 @@ class Database:
                     e.description, 
                     e.duration, 
                     e.ticket_title,
-                    e.todo,
                     p.name as project_name,
                     t.ticket_number as ticket_number
                 FROM entries e
@@ -918,3 +914,24 @@ class Database:
         project_id = row[0] if row else None
         self.disconnect()
         return project_id
+
+    def get_all_subtasks(self):
+        """Récupère tous les tickets de la table jira_subtasks."""
+        self.connect()
+        self.cursor.execute("""
+            SELECT ticket_key, title, path
+            FROM jira_subtasks
+            ORDER BY ticket_key
+        """)
+        
+        rows = self.cursor.fetchall()
+        result = [
+            {
+                'ticket_number': row[0],  # ticket_key dans la base
+                'title': row[1],
+                'path': row[2]
+            }
+            for row in rows
+        ]
+        self.disconnect()
+        return result

@@ -1,5 +1,20 @@
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget, QLineEdit
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtGui import QMouseEvent
+
+class ClickableLineEdit(QLineEdit):
+    clicked = pyqtSignal()
+    
+    def mousePressEvent(self, event):
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+class CustomComboBox(QComboBox):
+    def mousePressEvent(self, event):
+        """Surcharge de l'événement de clic pour afficher la liste."""
+        super().mousePressEvent(event)
+        if not self.view().isVisible():
+            self.showPopup()
 
 class TicketComboBox(QWidget):
     """Widget personnalisé pour la saisie et la sélection de tickets."""
@@ -19,8 +34,14 @@ class TicketComboBox(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # ComboBox éditable pour les tickets
-        self.combo = QComboBox()
+        self.combo = CustomComboBox()
         self.combo.setEditable(True)
+        
+        # Remplace le QLineEdit par notre ClickableLineEdit
+        line_edit = ClickableLineEdit()
+        line_edit.clicked.connect(self._on_click)
+        self.combo.setLineEdit(line_edit)
+        
         self.combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.combo.currentIndexChanged.connect(self._on_index_changed)
         self.combo.setMinimumWidth(200)  # Largeur minimale
@@ -39,22 +60,38 @@ class TicketComboBox(QWidget):
         # Style pour le label de compteur
         self.count_label.setStyleSheet("color: gray;")
     
+    def _on_click(self):
+        """Appelé quand l'utilisateur clique sur le champ."""
+        self.combo.showPopup()
+    
     def _on_index_changed(self, index):
         """Appelé quand l'index de la combobox change."""
         if index == 0:  # Option "Nouveau ticket"
             self.is_new_ticket = True
-            self.combo.setEditText("")
+            QTimer.singleShot(0, lambda: self.combo.setEditText(""))
             self.ticketChanged.emit("")
         elif index > 0:  # Un ticket existant
             self.is_new_ticket = False
             ticket_number = self.combo.itemData(index)
-            self.combo.setEditText(ticket_number)  # Affiche uniquement le numéro de ticket
+            # Utilise un QTimer pour s'assurer que le texte est mis à jour après le changement d'index
+            QTimer.singleShot(0, lambda: self.combo.setEditText(ticket_number))
             self.ticketChanged.emit(ticket_number)
     
     def _on_text_changed(self, text):
         """Gère la saisie manuelle de texte."""
-        if self.is_new_ticket or not self.combo.currentData():  # Si c'est un nouveau ticket ou aucun item n'est sélectionné
-            self.ticketChanged.emit(text)
+        # Si le texte est différent des tickets existants, c'est un nouveau ticket
+        if text and text not in self.tickets:
+            self.is_new_ticket = True
+        self.ticketChanged.emit(text)
+    
+    def _show_popup(self, event):
+        """Affiche la liste déroulante au clic ou au focus."""
+        self.combo.showPopup()
+        # Appelle l'événement original
+        if isinstance(event, QEvent.Type.FocusIn):
+            super(type(self.combo.lineEdit()), self.combo.lineEdit()).focusInEvent(event)
+        else:
+            super(type(self.combo.lineEdit()), self.combo.lineEdit()).mouseReleaseEvent(event)
     
     def set_tickets(self, tickets, current_ticket=None):
         """
@@ -106,11 +143,6 @@ class TicketComboBox(QWidget):
     
     def text(self):
         """Retourne le texte actuel (numéro de ticket uniquement)."""
-        if self.is_new_ticket:
-            return self.combo.currentText()
-        current_data = self.combo.currentData()
-        if current_data:
-            return current_data
         return self.combo.currentText()
     
     def setText(self, text):

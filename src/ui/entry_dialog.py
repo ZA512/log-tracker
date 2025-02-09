@@ -18,6 +18,7 @@ from utils.database import Database
 from utils.autocomplete import AutocompleteLineEdit
 from ui.ticket_combo import TicketComboBox
 from ui.project_combo import ProjectComboBox
+from ui.ticket_search_dialog import TicketSearchDialog
 
 class EntryDialog(QDialog):
     """Fenêtre de saisie d'une nouvelle entrée."""
@@ -109,10 +110,18 @@ class EntryDialog(QDialog):
         self.project_input.projectChanged.connect(self.on_project_changed)
         form_layout.addRow("Projet:", self.project_input)
 
-        # Ticket
+        # Ticket avec bouton de recherche
+        ticket_layout = QHBoxLayout()
         self.ticket_input = TicketComboBox()
         self.ticket_input.ticketChanged.connect(self.on_ticket_selected)
-        form_layout.addRow("Ticket:", self.ticket_input)
+        ticket_layout.addWidget(self.ticket_input)
+        
+        search_button = QPushButton("Rechercher")
+        search_button.clicked.connect(self._open_ticket_search)
+        search_button.setFixedWidth(100)
+        ticket_layout.addWidget(search_button)
+        
+        form_layout.addRow("Ticket:", ticket_layout)
 
         # Titre du ticket
         self.ticket_title = QLineEdit()
@@ -124,12 +133,6 @@ class EntryDialog(QDialog):
         self.description_input = QTextEdit()
         self.description_input.setFixedHeight(75)  # Hauteur réduite
         form_layout.addRow("Fait:", self.description_input)
-
-        # A faire
-        self.todo_input = QTextEdit()
-        self.todo_input.setFixedHeight(75)  # Même hauteur que la description
-        self.todo_input.setPlaceholderText("Optionnel")
-        form_layout.addRow("A faire:", self.todo_input)
 
         # Durée avec label "minutes" à droite et boutons de raccourcis
         duration_widget = QWidget()
@@ -222,7 +225,6 @@ class EntryDialog(QDialog):
         self.ticket_input.clear()
         self.ticket_title.clear()
         self.description_input.clear()
-        self.todo_input.clear()
         self.duration_input.setValue(60)
         
         # Recharge les projets pour l'autocomplétion seulement à l'initialisation
@@ -335,7 +337,6 @@ class EntryDialog(QDialog):
         project_name = self.project_input.text()
         ticket_number = self.ticket_input.text()
         description = self.description_input.toPlainText()
-        todo = self.todo_input.toPlainText()
         duration = self.duration_input.value()
         ticket_title = self.ticket_title.text()
         date = self.date_input.date().toString("yyyy-MM-dd")
@@ -343,6 +344,10 @@ class EntryDialog(QDialog):
 
         if not description:
             QMessageBox.warning(self, "Erreur", "La description est obligatoire.")
+            return
+
+        if not project_name:
+            QMessageBox.warning(self, "Erreur", "Le projet est obligatoire.")
             return
 
         try:
@@ -356,19 +361,25 @@ class EntryDialog(QDialog):
             # Récupère ou crée le ticket
             ticket_id = None
             if project_id and ticket_number:
-                ticket_info = self.db.get_ticket_info(project_id, ticket_number)
-                if ticket_info:
-                    ticket_id = ticket_info[0]
-                    # Met à jour le titre si nécessaire
-                    if ticket_title != ticket_info[2]:
-                        self.db.update_ticket_title(ticket_id, ticket_title)
-                else:
+                # Vérifie si le ticket existe déjà dans le projet
+                existing_tickets = self.db.get_project_tickets(project_id, include_inactive=True)
+                ticket_exists = any(t['ticket_number'] == ticket_number for t in existing_tickets)
+                
+                if not ticket_exists:
+                    # Nouveau ticket, on le crée
                     ticket_id = self.db.add_ticket(project_id, ticket_number, ticket_title)
+                else:
+                    # Le ticket existe déjà, on récupère ses infos
+                    ticket_info = self.db.get_ticket_info(project_id, ticket_number)
+                    if ticket_info:
+                        ticket_id = ticket_info[0]
+                        # Met à jour le titre si nécessaire
+                        if ticket_title != ticket_info[2]:
+                            self.db.update_ticket_title(ticket_id, ticket_title)
 
             # Ajoute l'entrée
             self.db.add_entry(
                 description=description,
-                todo=todo,
                 project_id=project_id,
                 ticket_id=ticket_id,
                 ticket_title=ticket_title,
@@ -381,3 +392,14 @@ class EntryDialog(QDialog):
 
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enregistrement : {str(e)}")
+
+    def _open_ticket_search(self):
+        """Ouvre la fenêtre de recherche de tickets."""
+        dialog = TicketSearchDialog(self, self.db)
+        dialog.ticketSelected.connect(self._on_search_ticket_selected)
+        dialog.exec()
+    
+    def _on_search_ticket_selected(self, ticket_number, title):
+        """Appelé quand un ticket est sélectionné dans la recherche."""
+        self.ticket_input.combo.setEditText(ticket_number)
+        self.ticket_title.setText(title)

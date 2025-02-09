@@ -1,5 +1,20 @@
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget, QCompleter
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget, QCompleter, QLineEdit
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QMouseEvent
+
+class ClickableLineEdit(QLineEdit):
+    clicked = pyqtSignal()
+    
+    def mousePressEvent(self, event):
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+class CustomComboBox(QComboBox):
+    def mousePressEvent(self, event):
+        """Surcharge de l'événement de clic pour afficher la liste."""
+        super().mousePressEvent(event)
+        if not self.view().isVisible():
+            self.showPopup()
 
 class ProjectComboBox(QWidget):
     """Widget personnalisé pour la sélection de projets."""
@@ -17,8 +32,14 @@ class ProjectComboBox(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # ComboBox éditable pour les projets
-        self.combo = QComboBox()
+        self.combo = CustomComboBox()
         self.combo.setEditable(True)
+        
+        # Remplace le QLineEdit par notre ClickableLineEdit
+        line_edit = ClickableLineEdit()
+        line_edit.clicked.connect(self._on_click)
+        self.combo.setLineEdit(line_edit)
+        
         self.combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.combo.currentTextChanged.connect(self._on_text_changed)
         self.combo.setMinimumWidth(200)  # Largeur minimale
@@ -32,9 +53,22 @@ class ProjectComboBox(QWidget):
         layout.addWidget(self.combo)
         self.setLayout(layout)
     
+    def _on_click(self):
+        """Appelé quand l'utilisateur clique sur le champ."""
+        self.combo.showPopup()
+    
     def _on_text_changed(self, text):
         """Gère le changement de texte dans la combobox."""
         self.projectChanged.emit(text)
+    
+    def _show_popup(self, event):
+        """Affiche la liste déroulante au clic ou au focus."""
+        self.combo.showPopup()
+        # Appelle l'événement original
+        if isinstance(event, QEvent.Type.FocusIn):
+            super(type(self.combo.lineEdit()), self.combo.lineEdit()).focusInEvent(event)
+        else:
+            super(type(self.combo.lineEdit()), self.combo.lineEdit()).mouseReleaseEvent(event)
     
     def set_projects(self, projects, current_project=None):
         """

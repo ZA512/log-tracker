@@ -310,15 +310,15 @@ class EntryDialogV2(QDialog):
         """Récupère le titre du ticket depuis Jira."""
         if self.jira_client:
             try:
-                issue = self.jira_client.get_issue(ticket_number)
+                issue = self.jira_client.get_issue_details(ticket_number)
                 if issue:
-                    self.title_input.setText(issue.fields.summary)
+                    self.title_input.setText(issue['summary'])
             except Exception as e:
                 pass
 
     def on_title_focus(self, event):
         """Appelé lorsque le champ titre reçoit le focus."""
-        ticket_number = self.ticket_combo.currentText()
+        ticket_number = self.ticket_combo.combo.currentText()
         if ticket_number and self.jira_client:
             self.fetch_ticket_title_from_jira(ticket_number)
 
