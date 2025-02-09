@@ -335,3 +335,51 @@ class JiraClient:
         except Exception as e:
             print(f"Erreur détaillée lors de la création de la sous-tâche : {str(e)}")
             return None
+
+    def get_labels(self, jql=None):
+        """
+        Récupère toutes les étiquettes disponibles dans Jira.
+        
+        Args:
+            jql: JQL optionnel pour filtrer les tickets
+            
+        Returns:
+            list: Liste des étiquettes ou None en cas d'erreur
+        """
+        try:
+            # Utilise le JQL fourni ou un JQL par défaut
+            search_jql = jql if jql else "labels is not EMPTY"
+            
+            # Récupère les tickets avec leurs étiquettes
+            response = requests.get(
+                f"{self.base_url}/rest/api/2/search",
+                params={
+                    "jql": search_jql,
+                    "maxResults": 100,  # Augmente pour avoir plus d'étiquettes
+                    "fields": "labels"
+                },
+                headers=self.headers
+            )
+            
+            if not response.ok:
+                error_details = response.json() if response.text else "Pas de détails d'erreur"
+                raise Exception(f"Erreur {response.status_code}: {error_details}")
+            
+            # Extrait les étiquettes de la réponse
+            data = response.json()
+            if not data.get("issues"):
+                return ["security"]  # Étiquette par défaut
+            
+            # Collecte toutes les étiquettes uniques
+            all_labels = set()
+            for issue in data["issues"]:
+                labels = issue.get("fields", {}).get("labels", [])
+                all_labels.update(labels)
+            
+            # Si aucune étiquette trouvée, retourne au moins "security"
+            labels_list = list(all_labels) if all_labels else ["security"]
+            return sorted(labels_list)  # Trie les étiquettes par ordre alphabétique
+            
+        except Exception as e:
+            print(f"Erreur lors de la récupération des étiquettes : {str(e)}")
+            return None

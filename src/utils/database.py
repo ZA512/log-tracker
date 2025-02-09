@@ -116,9 +116,18 @@ class Database:
                 )
             """)
             
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS jira_labels (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             # Création des index pour optimiser les recherches
             self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_jira_paths_path ON jira_paths(path)")
             self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_jira_subtasks_path ON jira_subtasks(path)")
+            self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_jira_labels_name ON jira_labels(name)")
             
             # Ajout des paramètres par défaut
             self.cursor.execute("""
@@ -955,3 +964,39 @@ class Database:
         ]
         self.disconnect()
         return result
+
+    def save_jira_labels(self, labels):
+        """
+        Sauvegarde les étiquettes Jira dans la base.
+        
+        Args:
+            labels: Liste des étiquettes
+        """
+        self.connect()
+        try:
+            # Vide la table
+            self.cursor.execute("DELETE FROM jira_labels")
+            
+            # Insère les nouvelles étiquettes
+            for label in labels:
+                self.cursor.execute(
+                    "INSERT INTO jira_labels (name) VALUES (?)",
+                    (label,)
+                )
+            self.conn.commit()
+        finally:
+            self.disconnect()
+    
+    def get_jira_labels(self):
+        """
+        Récupère toutes les étiquettes Jira.
+        
+        Returns:
+            list: Liste des étiquettes
+        """
+        self.connect()
+        try:
+            self.cursor.execute("SELECT name FROM jira_labels ORDER BY name")
+            return [row[0] for row in self.cursor.fetchall()]
+        finally:
+            self.disconnect()
