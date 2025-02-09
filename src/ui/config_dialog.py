@@ -182,10 +182,7 @@ class ConfigDialog(QDialog):
         project_jql_layout.addWidget(load_projects_button)
         jira_layout.addRow("JQL Projets:", project_jql_layout)
         
-        # Bouton de rafraîchissement des étiquettes
-        refresh_labels_button = QPushButton("Rafraîchir les étiquettes")
-        refresh_labels_button.clicked.connect(self.refresh_jira_labels)
-        jira_layout.addRow("", refresh_labels_button)
+        
         
         jira_group.setLayout(jira_layout)
         layout.addWidget(jira_group)
@@ -509,27 +506,4 @@ class ConfigDialog(QDialog):
             return False
         return True
 
-    def refresh_jira_labels(self):
-        """Rafraîchit les étiquettes depuis Jira."""
-        try:
-            if not self.check_jira_config():
-                return
-            
-            # Initialise le client Jira
-            jira = JiraClient(self.jira_url.text(), self.jira_token.text(), self.jira_user.text())
-            
-            # Utilise le JQL des tickets s'il est configuré
-            jql = self.ticket_jql.text()
-            
-            # Récupère les étiquettes
-            labels = jira.get_labels(jql)
-            if labels is None:
-                raise Exception("Impossible de récupérer les étiquettes")
-            
-            # Sauvegarde dans la base
-            self.db.save_jira_labels(labels)
-            
-            QMessageBox.information(self, "Succès", "Les étiquettes ont été mises à jour")
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors du chargement des étiquettes : {str(e)}")
+    

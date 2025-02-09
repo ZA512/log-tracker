@@ -48,9 +48,6 @@ class CreateTicketDialog(QDialog):
         self.components_label = QLabel("Components: Security (10297)")
         form_layout.addRow(self.components_label)
         
-        # Programme
-        self.program_label = QLabel("Programme: Autre (10057) > Autre (10286)")
-        form_layout.addRow(self.program_label)
         
         layout.addLayout(form_layout)
         
