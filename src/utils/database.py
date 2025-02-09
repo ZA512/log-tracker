@@ -935,3 +935,23 @@ class Database:
         ]
         self.disconnect()
         return result
+
+    def get_jira_paths(self):
+        """Récupère tous les chemins de la table jira_paths."""
+        self.connect()
+        self.cursor.execute("""
+            SELECT DISTINCT path, ticket_key
+            FROM jira_paths
+            ORDER BY created_at DESC
+        """)
+        
+        rows = self.cursor.fetchall()
+        result = [
+            {
+                'path': row[0],
+                'ticket_key': row[1]
+            }
+            for row in rows
+        ]
+        self.disconnect()
+        return result

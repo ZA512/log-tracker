@@ -261,3 +261,77 @@ class JiraClient:
         except Exception as e:
             print(f"Erreur lors de la récupération de la hiérarchie: {str(e)}")
             return []
+
+    def get_issue_types(self, project_key):
+        """
+        Récupère les types de tickets disponibles pour un projet.
+        
+        Args:
+            project_key: Clé du projet (ex: 'DSI')
+            
+        Returns:
+            list: Liste des types de tickets ou None en cas d'erreur
+        """
+        try:
+            response = requests.get(
+                f"{self.base_url}/rest/api/2/issue/createmeta/{project_key}/issuetypes"
+            )
+            
+            if not response.ok:
+                error_details = response.json() if response.text else "Pas de détails d'erreur"
+                raise Exception(f"Erreur {response.status_code}: {error_details}")
+            
+            return response.json()
+            
+        except Exception as e:
+            print(f"Erreur lors de la récupération des types de tickets : {str(e)}")
+            return None
+
+    def create_subtask(self, parent_key, summary, description, components=None, team=None, programme=None, sous_programme=None):
+        """
+        Crée une sous-tâche dans Jira.
+        
+        Args:
+            parent_key: Clé du ticket parent
+            summary: Titre de la sous-tâche
+            description: Description de la sous-tâche
+            components: Liste des composants (ignoré pour les sous-tâches)
+            team: Équipe assignée (ignoré)
+            programme: Programme (ignoré pour les sous-tâches)
+            sous_programme: Sous-programme (ignoré pour les sous-tâches)
+        
+        Returns:
+            dict: Les données du ticket créé ou None en cas d'erreur
+        """
+        try:
+            # Prépare les données de la requête
+            data = {
+                "fields": {
+                    "project": {"key": parent_key.split('-')[0]},
+                    "parent": {"key": parent_key},
+                    "summary": summary,
+                    "description": description,
+                    "issuetype": {"name": "Sous-tâche"},
+                    "labels": ["security"]  # Étiquette
+                }
+            }
+            
+            print(f"Données envoyées à Jira : {data}")  # Debug
+            
+            # Crée la sous-tâche
+            response = requests.post(
+                f"{self.base_url}/rest/api/2/issue",
+                headers=self.headers,
+                json=data
+            )
+            
+            if not response.ok:
+                error_details = response.json() if response.text else "Pas de détails d'erreur"
+                raise Exception(f"Erreur {response.status_code}: {error_details}")
+            
+            created_issue = response.json()
+            return created_issue
+            
+        except Exception as e:
+            print(f"Erreur détaillée lors de la création de la sous-tâche : {str(e)}")
+            return None

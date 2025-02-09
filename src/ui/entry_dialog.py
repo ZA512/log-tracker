@@ -19,6 +19,7 @@ from utils.autocomplete import AutocompleteLineEdit
 from ui.ticket_combo import TicketComboBox
 from ui.project_combo import ProjectComboBox
 from ui.ticket_search_dialog import TicketSearchDialog
+from ui.create_ticket_dialog import CreateTicketDialog
 
 class EntryDialog(QDialog):
     """Fenêtre de saisie d'une nouvelle entrée."""
@@ -403,3 +404,10 @@ class EntryDialog(QDialog):
         """Appelé quand un ticket est sélectionné dans la recherche."""
         self.ticket_input.combo.setEditText(ticket_number)
         self.ticket_title.setText(title)
+
+    def _open_create_ticket(self):
+        """Ouvre la fenêtre de création de ticket."""
+        dialog = CreateTicketDialog(self, self.db, self.jira_client)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Le ticket a été créé avec succès, on pourrait rafraîchir la liste des tickets ici si nécessaire
+            pass

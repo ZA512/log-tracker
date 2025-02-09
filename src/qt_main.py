@@ -17,6 +17,7 @@ import json
 
 from utils.database import Database
 from utils.autocomplete import AutocompleteLineEdit
+from utils.jira_client import JiraClient
 from ui.ticket_combo import TicketComboBox
 from ui.project_combo import ProjectComboBox
 from ui.config_dialog import ConfigDialog
@@ -25,6 +26,7 @@ from ui.entry_dialog import EntryDialog
 from ui.entry_dialog_v2 import EntryDialogV2
 from ui.entries_dialog import EntriesDialog
 from ui.projects_dialog import ProjectsDialog
+from ui.create_ticket_dialog import CreateTicketDialog
 from ui.theme import Theme, DEFAULT_THEME, DARK_THEME
 
 class LogTrackerApp(QMainWindow):
@@ -38,6 +40,7 @@ class LogTrackerApp(QMainWindow):
         self.config_dialog = None
         self.sync_dialog = None
         self.projects_dialog = None
+        self.jira_client = None  # Sera initialisé lors de la configuration
         self.last_entry_time = None
         self.total_duration = 0
         
@@ -72,6 +75,15 @@ class LogTrackerApp(QMainWindow):
         self.end_time = self.db.get_setting('end_time', "17:00")
         self.hours_per_day = float(self.db.get_setting('hours_per_day', "8"))
         self.daily_hours = int(self.db.get_setting('daily_hours', '8'))
+        
+        # Initialise le client Jira
+        jira_config = self.db.get_jira_config()
+        if jira_config and jira_config.get('jira_base_url') and jira_config.get('jira_email') and jira_config.get('jira_token'):
+            self.jira_client = JiraClient(
+                base_url=jira_config['jira_base_url'],
+                email=jira_config['jira_email'],
+                token=jira_config['jira_token']
+            )
 
     def load_svg_icon(self, filename):
         """Charge une icône SVG depuis le dossier resources."""
@@ -169,6 +181,7 @@ class LogTrackerApp(QMainWindow):
         add_button = create_tool_button('plus.svg', "Ajouter une entrée", self.on_add_clicked)
         list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
         self.sync_button = create_tool_button('refresh.svg', "Synchroniser vers jira", self.show_sync_dialog)
+        new_ticket_button = create_tool_button('ticket-plus.svg', "Créer un nouveau ticket", self.show_create_ticket_dialog)
         config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
         projects_button = create_tool_button('projects.svg', "Projets", self.show_projects_dialog)
 
@@ -179,6 +192,7 @@ class LogTrackerApp(QMainWindow):
         toolbar.addWidget(add_button)
         toolbar.addWidget(list_button)
         toolbar.addWidget(self.sync_button)
+        toolbar.addWidget(new_ticket_button)
         toolbar.addStretch()
         toolbar.addWidget(config_button)
         toolbar.addWidget(projects_button)
@@ -515,6 +529,15 @@ class LogTrackerApp(QMainWindow):
             self.entry_dialog = EntryDialogV2(self, self.db, self.current_theme)
         self.entry_dialog.show()
         self.entry_dialog.activateWindow()
+
+    def show_create_ticket_dialog(self):
+        """Affiche la fenêtre de création de ticket."""
+        if not self.jira_client:
+            QMessageBox.warning(self, "Erreur", "Veuillez d'abord configurer la connexion Jira")
+            return
+            
+        dialog = CreateTicketDialog(self, self.db, self.jira_client)
+        dialog.exec()
 
 
 def main():
