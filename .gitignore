@@ -2,6 +2,7 @@
 venv/
 env/
 ENV/
+.windsurfrules
 
 # Python
 __pycache__/
@@ -25,6 +26,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+project/
 
 # IDE
 .idea/
