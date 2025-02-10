@@ -119,6 +119,12 @@ class ConfigDialog(QDialog):
         self.hours_per_day.setPlaceholderText("8")
         general_layout.addRow("Heures de travail par jour:", self.hours_per_day)
         
+        # Sélecteur d'incrément de temps
+        self.time_increment_combo = QComboBox()
+        for increment in [1, 5, 10, 15, 30]:
+            self.time_increment_combo.addItem(f"{increment} minutes", increment)
+        general_layout.addRow("Incrément de temps:", self.time_increment_combo)
+        
         self.use_sequential_time = QCheckBox("Utiliser l'heure séquentielle")
         general_layout.addRow(self.use_sequential_time)
         
@@ -217,6 +223,12 @@ class ConfigDialog(QDialog):
         use_sequential = self.db.get_setting('use_sequential_time', '0')
         self.use_sequential_time.setChecked(use_sequential == '1')
         
+        # Sélecteur d'incrément de temps
+        time_increment = self.db.get_setting('time_increment', '5')
+        index = self.time_increment_combo.findData(int(time_increment))
+        if index >= 0:
+            self.time_increment_combo.setCurrentIndex(index)
+        
         # Configuration Jira
         config = self.db.get_jira_config()
         self.jira_url.setText(config.get('jira_base_url', ''))
@@ -235,6 +247,7 @@ class ConfigDialog(QDialog):
             self.db.save_setting('end_time', self.end_time.time().toString("HH:mm"))
             self.db.save_setting('hours_per_day', self.hours_per_day.text())
             self.db.save_setting('use_sequential_time', '1' if self.use_sequential_time.isChecked() else '0')
+            self.db.save_setting('time_increment', str(self.time_increment_combo.currentData()))
             self.db.save_setting('theme', self.theme_combo.currentText())
             self.db.save_setting('entry_screen_type', self.entry_type_combo.currentData())
             
@@ -505,5 +518,3 @@ class ConfigDialog(QDialog):
                 "Veuillez configurer les paramètres Jira (URL, Token, Utilisateur)")
             return False
         return True
-
-    

@@ -24,9 +24,6 @@ from ui.create_ticket_dialog import CreateTicketDialog
 class EntryDialog(QDialog):
     """Fenêtre de saisie d'une nouvelle entrée."""
 
-    # Constante de classe pour l'incrément de temps
-    TIME_INCREMENT = 5  # minutes
-
     def __init__(self, parent=None, db=None):
         super().__init__(parent)
         self.db = db
@@ -38,6 +35,11 @@ class EntryDialog(QDialog):
         self.clear_all(init=True)  # Efface tout à l'initialisation
         # Force le focus sur le projet
         QTimer.singleShot(0, lambda: self.project_input.setFocus())
+
+    @property
+    def time_increment(self):
+        """Récupère l'incrément de temps depuis la configuration."""
+        return int(self.db.get_setting('time_increment', '5'))
 
     def setup_jira_client(self):
         """Configure le client Jira avec les paramètres de la base de données."""
@@ -144,7 +146,7 @@ class EntryDialog(QDialog):
         
         # SpinBox pour la durée en minutes (aligné avec les autres champs)
         self.duration_input = QSpinBox()
-        self.duration_input.setMinimum(self.TIME_INCREMENT)
+        self.duration_input.setMinimum(self.time_increment)
         self.duration_input.setMaximum(480)
         self.duration_input.setValue(60)  # 1 heure par défaut
         self.duration_input.setSuffix(" minutes")
@@ -179,7 +181,7 @@ class EntryDialog(QDialog):
         
         # Slider pour la durée
         self.duration_slider = QSlider(Qt.Orientation.Horizontal)
-        self.duration_slider.setMinimum(self.TIME_INCREMENT)
+        self.duration_slider.setMinimum(self.time_increment)
         self.duration_slider.setMaximum(480)
         self.duration_slider.setValue(60)  # 1 heure par défaut
         self.duration_slider.setPageStep(30)
@@ -428,14 +430,14 @@ class EntryDialog(QDialog):
         """Appelé lorsque le slider est relâché pour aligner sur l'incrément."""
         current_value = self.duration_slider.value()
         # Arrondir à l'incrément le plus proche
-        adjusted_value = round(current_value / self.TIME_INCREMENT) * self.TIME_INCREMENT
+        adjusted_value = round(current_value / self.time_increment) * self.time_increment
         self.duration_slider.setValue(adjusted_value)
 
     def on_spinbox_changed(self):
         """Appelé lorsque la valeur du spinbox change."""
         duration = self.duration_input.value()
         # Arrondir à l'incrément le plus proche
-        adjusted_value = round(duration / self.TIME_INCREMENT) * self.TIME_INCREMENT
+        adjusted_value = round(duration / self.time_increment) * self.time_increment
         if adjusted_value != duration:
             self.duration_input.setValue(adjusted_value)
             return
