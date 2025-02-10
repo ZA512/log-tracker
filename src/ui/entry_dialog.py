@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QTextEdit, QTreeWidget, QTreeWidgetItem,
     QFrame, QSpinBox, QComboBox, QRadioButton, QButtonGroup, QGroupBox,
     QSplitter, QDialog, QFormLayout, QStyle, QToolButton, QDialogButtonBox, QMessageBox,
-    QDateEdit, QTimeEdit
+    QDateEdit, QTimeEdit, QSlider, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime
 from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
@@ -23,6 +23,9 @@ from ui.create_ticket_dialog import CreateTicketDialog
 
 class EntryDialog(QDialog):
     """Fenêtre de saisie d'une nouvelle entrée."""
+
+    # Constante de classe pour l'incrément de temps
+    TIME_INCREMENT = 5  # minutes
 
     def __init__(self, parent=None, db=None):
         super().__init__(parent)
@@ -86,6 +89,7 @@ class EntryDialog(QDialog):
 
         main_layout = QVBoxLayout()
         form_layout = QFormLayout()
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)  # Permet aux widgets de la colonne des champs de s'étendre sur toute la largeur
 
         # Date et heure
         date_time_layout = QHBoxLayout()
@@ -135,65 +139,64 @@ class EntryDialog(QDialog):
         self.description_input.setFixedHeight(75)  # Hauteur réduite
         form_layout.addRow("Fait:", self.description_input)
 
-        # Durée avec label "minutes" à droite et boutons de raccourcis
-        duration_widget = QWidget()
-        duration_layout = QVBoxLayout(duration_widget)
-        duration_layout.setContentsMargins(0, 0, 0, 0)
-        duration_layout.setSpacing(5)
+        # Durée avec spinbox aligné avec les autres champs
+        duration_top_layout = QHBoxLayout()
         
-        # Ligne avec le spinbox et le label minutes
-        spinbox_layout = QHBoxLayout()
-        spinbox_layout.setSpacing(5)
-        
+        # SpinBox pour la durée en minutes (aligné avec les autres champs)
         self.duration_input = QSpinBox()
-        self.duration_input.setMinimum(1)
-        self.duration_input.setMaximum(480)  # 8 heures
+        self.duration_input.setMinimum(self.TIME_INCREMENT)
+        self.duration_input.setMaximum(480)
         self.duration_input.setValue(60)  # 1 heure par défaut
         self.duration_input.setSuffix(" minutes")
-        
-        spinbox_layout.addWidget(self.duration_input)
+        self.duration_input.valueChanged.connect(self.on_spinbox_changed)
+        duration_top_layout.addWidget(self.duration_input)
 
         # Icône d'information pour le temps restant
         info_button = QToolButton()
         info_button.setIcon(QIcon("src/resources/info.svg"))
-        info_button.setToolTip("Chargement...")  # Tooltip initial
-        spinbox_layout.addWidget(info_button)
-
-        spinbox_layout.addStretch()
+        info_button.setToolTip("Chargement...")
+        duration_top_layout.addWidget(info_button)
+        duration_top_layout.addStretch()
         
-        duration_layout.addLayout(spinbox_layout)
+        # Créer un label temporaire pour mesurer la largeur
+        temp_label = QLabel("Durée:")
+        label_width = temp_label.sizeHint().width()
+        
+        form_layout.addRow("Durée:", duration_top_layout)
+
+        # Label pour afficher le temps au format HH:MM
+        duration_label_container = QWidget()
+        duration_label_layout = QHBoxLayout(duration_label_container)
+        duration_label_layout.setContentsMargins(0, 0, 0, 0)
+        self.duration_label = QLabel("01h00")  # Valeur initiale 60 minutes
+        duration_label_layout.addWidget(self.duration_label)
+        duration_label_layout.addStretch()
+
+        # Container pour le slider
+        slider_container = QWidget()
+        slider_layout = QHBoxLayout(slider_container)
+        slider_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Slider pour la durée
+        self.duration_slider = QSlider(Qt.Orientation.Horizontal)
+        self.duration_slider.setMinimum(self.TIME_INCREMENT)
+        self.duration_slider.setMaximum(480)
+        self.duration_slider.setValue(60)  # 1 heure par défaut
+        self.duration_slider.setPageStep(30)
+        self.duration_slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.duration_slider.valueChanged.connect(self.on_duration_changed)
+        self.duration_slider.sliderReleased.connect(self.on_slider_released)
+        slider_layout.addWidget(self.duration_slider)
+        
+        slider_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        form_layout.addRow(duration_label_container, slider_container)
+        
         # Mise à jour du tooltip quand la date change
         self.date_input.dateChanged.connect(lambda: self.update_remaining_time(info_button))
         
         # Mise à jour initiale du tooltip
         QTimer.singleShot(0, lambda: self.update_remaining_time(info_button))
         
-        # Ligne avec les boutons de raccourcis
-        shortcuts_layout = QHBoxLayout()
-        shortcuts_layout.setSpacing(5)
-        
-        # Fonction pour créer un bouton de raccourci
-        def create_shortcut_button(text, minutes):
-            button = QPushButton(text)
-            button.clicked.connect(lambda: self.duration_input.setValue(minutes))
-            button.setFixedWidth(40)
-            button.setAutoDefault(False)  # Empêche le bouton d'être sélectionné par défaut
-            button.setDefault(False)      # Empêche le bouton d'être le bouton par défaut
-            return button
-        
-        # Création des boutons de raccourcis
-        durations = [
-            ("15m", 15), ("30m", 30), ("1h", 60), ("2h", 120),
-            ("3h", 180), ("4h", 240), ("5h", 300), ("6h", 360),
-            ("7h", 420), ("8h", 480)
-        ]
-        
-        for text, minutes in durations:
-            shortcuts_layout.addWidget(create_shortcut_button(text, minutes))
-        
-        duration_layout.addLayout(shortcuts_layout)
-        form_layout.addRow("Durée:", duration_widget)
-
         main_layout.addLayout(form_layout)
 
         # Boutons
@@ -212,7 +215,7 @@ class EntryDialog(QDialog):
         self.setLayout(main_layout)
 
     def clear_all(self, init=False):
-        """Efface tous les champs et remet les valeurs par défaut."""
+        """Efface tous les champs."""
         # Remet la date et l'heure actuelles
         self.date_input.setDate(QDate.currentDate())
         if self.db.get_setting('use_sequential_time', '0') == '1':
@@ -226,7 +229,8 @@ class EntryDialog(QDialog):
         self.ticket_input.clear()
         self.ticket_title.clear()
         self.description_input.clear()
-        self.duration_input.setValue(60)
+        self.duration_slider.setValue(60)  # 1 heure par défaut
+        self.duration_input.setValue(60)  # 1 heure par défaut
         
         # Recharge les projets pour l'autocomplétion seulement à l'initialisation
         if init:
@@ -338,7 +342,7 @@ class EntryDialog(QDialog):
         project_name = self.project_input.text()
         ticket_number = self.ticket_input.text()
         description = self.description_input.toPlainText()
-        duration = self.duration_input.value()
+        duration = self.duration_slider.value()
         ticket_title = self.ticket_title.text()
         date = self.date_input.date().toString("yyyy-MM-dd")
         time = self.time_input.time().toString("HH:mm")
@@ -411,3 +415,31 @@ class EntryDialog(QDialog):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             # Le ticket a été créé avec succès, on pourrait rafraîchir la liste des tickets ici si nécessaire
             pass
+
+    def on_duration_changed(self):
+        """Appelé lorsque la valeur du slider change."""
+        duration = self.duration_slider.value()
+        hours = duration // 60
+        minutes = duration % 60
+        self.duration_label.setText(f"{hours:02d}h{minutes:02d}")
+        self.duration_input.setValue(duration)
+
+    def on_slider_released(self):
+        """Appelé lorsque le slider est relâché pour aligner sur l'incrément."""
+        current_value = self.duration_slider.value()
+        # Arrondir à l'incrément le plus proche
+        adjusted_value = round(current_value / self.TIME_INCREMENT) * self.TIME_INCREMENT
+        self.duration_slider.setValue(adjusted_value)
+
+    def on_spinbox_changed(self):
+        """Appelé lorsque la valeur du spinbox change."""
+        duration = self.duration_input.value()
+        # Arrondir à l'incrément le plus proche
+        adjusted_value = round(duration / self.TIME_INCREMENT) * self.TIME_INCREMENT
+        if adjusted_value != duration:
+            self.duration_input.setValue(adjusted_value)
+            return
+        self.duration_slider.setValue(adjusted_value)
+        hours = adjusted_value // 60
+        minutes = adjusted_value % 60
+        self.duration_label.setText(f"{hours:02d}h{minutes:02d}")
