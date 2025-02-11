@@ -217,8 +217,8 @@ class LogTrackerApp(QMainWindow):
         clock_icon.setPixmap(clock_pixmap)
         
         self.current_time_label = QLabel("00:00")
-        self.current_time_label.setToolTip("Temps depuis la dernière saisie")
-        clock_icon.setToolTip("Temps depuis la dernière saisie")
+        self.current_time_label.setToolTip("Prochain créneau disponible")
+        clock_icon.setToolTip("Prochain créneau disponible")
         current_time_layout.addWidget(clock_icon)
         current_time_layout.addWidget(self.current_time_label)
         
@@ -352,20 +352,30 @@ class LogTrackerApp(QMainWindow):
             else:
                 self.unsync_time_label.setText(f"{unsync_mins}m")
 
-            # Met à jour le temps écoulé depuis la dernière entrée
+            # Calcule le prochain créneau disponible
+            start_time = datetime.strptime(self.db.get_setting('start_time', '08:30'), '%H:%M').time()
+            next_slot = datetime.combine(today, start_time)
+
             if entries:
-                last_entry = entries[0]  # Dernière entrée
-                last_time = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
-                elapsed_minutes = int((datetime.now() - last_time).total_seconds() / 60)
-                hours = elapsed_minutes // 60
-                minutes = elapsed_minutes % 60
+                # Trie les entrées par date et heure
+                sorted_entries = sorted(entries, key=lambda x: (x['date'], x['time']))
                 
-                if hours > 0:
-                    self.current_time_label.setText(f"{hours}h{minutes:02d}")
-                else:
-                    self.current_time_label.setText(f"{minutes}m")
-            else:
-                self.current_time_label.setText("00:00")
+                # Pour chaque entrée, met à jour le prochain créneau disponible
+                for entry in sorted_entries:
+                    entry_time = datetime.strptime(f"{entry['date']} {entry['time']}", "%Y-%m-%d %H:%M")
+                    entry_end = entry_time + timedelta(minutes=entry['duration'])
+                    
+                    # Si l'entrée commence après le créneau actuel, on garde ce créneau
+                    if entry_time > next_slot:
+                        break
+                    
+                    # Sinon, le prochain créneau sera après cette entrée
+                    next_slot = entry_end
+
+            # Formate l'heure du prochain créneau
+            self.current_time_label.setText(next_slot.strftime("%H:%M"))
+            self.current_time_label.setToolTip("Prochain créneau disponible")
+
         except Exception as e:
             print(f"Erreur lors de la mise à jour du résumé : {str(e)}")
 

@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QTextEdit, QTreeWidget, QTreeWidgetItem,
     QFrame, QSpinBox, QComboBox, QRadioButton, QButtonGroup, QGroupBox,
     QSplitter, QDialog, QFormLayout, QStyle, QToolButton, QDialogButtonBox, QMessageBox,
-    QDateEdit, QTimeEdit, QSlider, QSizePolicy
+    QDateEdit, QSlider, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime
 from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
@@ -20,6 +20,7 @@ from ui.ticket_combo import TicketComboBox
 from ui.project_combo import ProjectComboBox
 from ui.ticket_search_dialog import TicketSearchDialog
 from ui.create_ticket_dialog import CreateTicketDialog
+from ui.time_selector import TimeSelector
 
 class EntryDialog(QDialog):
     """Fenêtre de saisie d'une nouvelle entrée."""
@@ -100,13 +101,12 @@ class EntryDialog(QDialog):
         self.date_input.setCalendarPopup(True)
         self.date_input.setDate(QDate.currentDate())
         
-        self.time_input = QTimeEdit()
+        self.time_input = TimeSelector()
         if self.db.get_setting('use_sequential_time', '0') == '1':
             sequential_time = self.db.get_sequential_time(self.date_input.date().toString("yyyy-MM-dd"))
-            self.time_input.setTime(QTime.fromString(sequential_time, "HH:mm"))
+            self.time_input.setTime(sequential_time)
         else:
             self.time_input.setTime(QTime.currentTime())
-        self.time_input.setDisplayFormat("HH:mm")
         
         date_time_layout.addWidget(self.date_input)
         date_time_layout.addWidget(self.time_input)
@@ -222,7 +222,7 @@ class EntryDialog(QDialog):
         self.date_input.setDate(QDate.currentDate())
         if self.db.get_setting('use_sequential_time', '0') == '1':
             sequential_time = self.db.get_sequential_time(self.date_input.date().toString("yyyy-MM-dd"))
-            self.time_input.setTime(QTime.fromString(sequential_time, "HH:mm"))
+            self.time_input.setTime(sequential_time)
         else:
             self.time_input.setTime(QTime.currentTime())
         
