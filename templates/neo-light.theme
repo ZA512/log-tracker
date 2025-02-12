@@ -1,0 +1,11 @@
+window_background=#f5f7fa
+text_color=#1f2933
+button_background=#dbeafe
+button_text=#1f2933
+button_border=#93c5fd
+input_background=#ffffff
+input_text=#1f2933
+input_border=#93c5fd
+group_title_color=#2563eb
+group_box_border=#93c5fd
+link_color=#2563eb
