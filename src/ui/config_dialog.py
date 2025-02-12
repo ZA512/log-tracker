@@ -90,7 +90,9 @@ class JiraImportThread(QThread):
 
 class ConfigDialog(QDialog):
     """Fenêtre de configuration pour les paramètres de l'application."""
-
+    
+    theme_changed = pyqtSignal(str)  # Signal émis quand le thème change
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.db = Database()
@@ -137,6 +139,7 @@ class ConfigDialog(QDialog):
         index = self.theme_combo.findText(current_theme)
         if index >= 0:
             self.theme_combo.setCurrentIndex(index)
+        self.theme_combo.currentTextChanged.connect(self.apply_theme)
         general_layout.addRow("Thème:", self.theme_combo)
         
         # Sélecteur du type d'écran de saisie
@@ -518,3 +521,9 @@ class ConfigDialog(QDialog):
                 "Veuillez configurer les paramètres Jira (URL, Token, Utilisateur)")
             return False
         return True
+
+    def apply_theme(self, theme_name: str):
+        """Applique le thème sélectionné à la fenêtre de configuration."""
+        theme = Theme(theme_name)
+        self.setStyleSheet(theme.get_stylesheet())
+        self.theme_changed.emit(theme_name)  # Émet le signal avec le nouveau thème

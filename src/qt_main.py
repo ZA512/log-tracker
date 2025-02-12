@@ -492,12 +492,31 @@ class LogTrackerApp(QMainWindow):
 
     def show_config_dialog(self):
         """Affiche la fenêtre de configuration."""
-        if self.config_dialog is not None:
-            self.config_dialog.close()
-        self.config_dialog = ConfigDialog(self)
-        if self.config_dialog.exec():
-            self.update_sync_button_state()
-    
+        if not self.config_dialog:
+            self.config_dialog = ConfigDialog(self)
+            self.config_dialog.theme_changed.connect(self.apply_theme_to_all)
+        self.config_dialog.show()
+
+    def apply_theme_to_all(self, theme_name: str):
+        """Applique le thème à toutes les fenêtres de l'application."""
+        theme = Theme(theme_name)
+        stylesheet = theme.get_stylesheet()
+        
+        # Applique le thème à la fenêtre principale
+        self.setStyleSheet(stylesheet)
+        
+        # Applique le thème à toutes les fenêtres de dialogue
+        dialogs = [
+            self.entry_dialog,
+            self.entries_dialog,
+            self.sync_dialog,
+            self.projects_dialog
+        ]
+        
+        for dialog in dialogs:
+            if dialog is not None:
+                dialog.setStyleSheet(stylesheet)
+
     def show_sync_dialog(self):
         """Affiche la fenêtre de synchronisation."""
         if not self.sync_dialog:
