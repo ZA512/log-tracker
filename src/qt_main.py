@@ -369,20 +369,15 @@ class LogTrackerApp(QMainWindow):
             next_slot = datetime.combine(today, start_time)
 
             if entries:
-                # Trie les entrées par date et heure
-                sorted_entries = sorted(entries, key=lambda x: (x['date'], x['time']))
+                # Trie les entrées par date et heure décroissantes pour avoir la plus récente en premier
+                sorted_entries = sorted(entries, key=lambda x: (x['date'], x['time']), reverse=True)
                 
-                # Pour chaque entrée, met à jour le prochain créneau disponible
-                for entry in sorted_entries:
-                    entry_time = datetime.strptime(f"{entry['date']} {entry['time']}", "%Y-%m-%d %H:%M")
-                    entry_end = entry_time + timedelta(minutes=entry['duration'])
-                    
-                    # Si l'entrée commence après le créneau actuel, on garde ce créneau
-                    if entry_time > next_slot:
-                        break
-                    
-                    # Sinon, le prochain créneau sera après cette entrée
-                    next_slot = entry_end
+                # Prend la dernière entrée (la plus récente)
+                last_entry = sorted_entries[0]
+                entry_time = datetime.strptime(f"{last_entry['date']} {last_entry['time']}", "%Y-%m-%d %H:%M")
+                
+                # Le prochain créneau est après la fin de la dernière entrée
+                next_slot = entry_time + timedelta(minutes=last_entry['duration'])
 
             # Formate l'heure du prochain créneau
             self.current_time_label.setText(next_slot.strftime("%H:%M"))
