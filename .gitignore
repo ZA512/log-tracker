@@ -2,7 +2,7 @@
 venv/
 env/
 ENV/
-.windsurfrules
+
 
 # Python
 __pycache__/
@@ -47,3 +47,4 @@ RELEASE_INSTRUCTIONS.md
 # test
 *.test
 *.tests
+.windsurfrules
