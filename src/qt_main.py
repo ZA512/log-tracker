@@ -10,8 +10,9 @@ from PyQt6.QtWidgets import (
     QSplitter, QDialog, QFormLayout, QStyle, QToolButton, QDialogButtonBox, QMessageBox,
     QDateEdit, QTimeEdit, QStatusBar, QMenuBar, QApplication
 )
-from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime
-from PyQt6.QtGui import QFont, QIcon, QPainter, QColor, QPalette, QAction
+from PyQt6.QtCore import Qt, QTimer, QSize, QDate, QTime, QByteArray
+from PyQt6.QtGui import QFont, QIcon, QPainter, QColor, QPalette, QAction, QImage, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
 import os
 import json
 
@@ -94,20 +95,49 @@ class LogTrackerApp(QMainWindow):
                 base_path = sys._MEIPASS
                 resources_dir = 'resources'
             else:
-                # Si nous sommes en développement
+                # En développement
                 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                resources_dir = os.path.join('src', 'resources')
+                resources_dir = 'src/resources'
 
-            # Construire le chemin complet vers l'icône
             icon_path = os.path.join(base_path, resources_dir, filename)
             
             # Vérifier si le fichier existe
             if not os.path.exists(icon_path):
                 print(f"Icône non trouvée : {icon_path}")
                 return QIcon()
-    
-            # Charger et retourner l'icône
-            return QIcon(icon_path)
+
+            # Lire le contenu du SVG
+            with open(icon_path, 'r', encoding='utf-8') as file:
+                svg_content = file.read()
+            
+            # Remplacer la couleur placeholder par la couleur du thème
+            svg_content_modified = svg_content.replace('#PLACEHOLDER', self.current_theme.text_color)
+            
+            # Créer une nouvelle icône
+            icon = QIcon()
+            
+            # Créer un QSvgRenderer avec le contenu SVG modifié
+            renderer = QSvgRenderer(QByteArray(svg_content_modified.encode('utf-8')))
+            if not renderer.isValid():
+                print(f"Erreur : Le SVG {filename} n'est pas valide")
+                return QIcon()
+            
+            # Pour chaque taille d'icône
+            for size in [16, 24, 32, 48]:
+                # Créer un QPixmap avec fond transparent
+                pixmap = QPixmap(size, size)
+                pixmap.fill(Qt.GlobalColor.transparent)
+                
+                # Dessiner le SVG sur le pixmap
+                painter = QPainter(pixmap)
+                renderer.render(painter)
+                painter.end()
+                
+                # Ajouter le pixmap à l'icône
+                icon.addPixmap(pixmap)
+            
+            return icon
+            
         except Exception as e:
             print(f"Erreur lors du chargement de l'icône {filename}: {str(e)}")
             return QIcon()
@@ -165,37 +195,31 @@ class LogTrackerApp(QMainWindow):
         def create_tool_button(icon_name, tooltip, callback):
             button = QToolButton()
             icon = self.load_svg_icon(icon_name)
-            # Force la couleur de l'icône en blanc
-            pixmap = icon.pixmap(QSize(16, 16))
-            painter = QPainter(pixmap)
-            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-            painter.fillRect(pixmap.rect(), QColor("#d0d0d1"))
-            painter.end()
-            button.setIcon(QIcon(pixmap))
+            button.setIcon(icon)
             button.setIconSize(QSize(16, 16))
             button.setToolTip(tooltip)
             button.clicked.connect(callback)
             return button
 
         # Création des boutons avec les icônes colorées
-        add_button = create_tool_button('plus.svg', "Ajouter une entrée", self.on_add_clicked)
-        list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
+        self.add_button = create_tool_button('plus.svg', "Ajouter une entrée", self.on_add_clicked)
+        self.list_button = create_tool_button('list.svg', "Voir les entrées", self.show_entries_dialog)
         self.sync_button = create_tool_button('refresh.svg', "Synchroniser vers jira", self.show_sync_dialog)
-        new_ticket_button = create_tool_button('ticket-plus.svg', "Créer un nouveau ticket", self.show_create_ticket_dialog)
-        config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
-        projects_button = create_tool_button('projects.svg', "Projets", self.show_projects_dialog)
+        self.new_ticket_button = create_tool_button('ticket-plus.svg', "Créer un nouveau ticket", self.show_create_ticket_dialog)
+        self.config_button = create_tool_button('settings.svg', "Configuration", self.show_config_dialog)
+        self.projects_button = create_tool_button('projects.svg', "Projets", self.show_projects_dialog)
 
         # Met à jour l'état du bouton de synchronisation
         self.update_sync_button_state()
 
         # Ajout des boutons à la barre d'outils
-        toolbar.addWidget(add_button)
-        toolbar.addWidget(list_button)
+        toolbar.addWidget(self.add_button)
+        toolbar.addWidget(self.list_button)
         toolbar.addWidget(self.sync_button)
-        toolbar.addWidget(new_ticket_button)
+        toolbar.addWidget(self.new_ticket_button)
         toolbar.addStretch()
-        toolbar.addWidget(config_button)
-        toolbar.addWidget(projects_button)
+        toolbar.addWidget(self.config_button)
+        toolbar.addWidget(self.projects_button)
 
         main_layout.addLayout(toolbar)
 
@@ -207,57 +231,45 @@ class LogTrackerApp(QMainWindow):
         current_time_layout = QHBoxLayout()
         current_time_layout.setSpacing(5)
         
-        # Création de l'icône d'horloge colorée
-        clock_icon = QLabel()
+        # Création de l'icône d'horloge
+        self.clock_icon = QLabel()
         clock_pixmap = self.load_svg_icon('clock.svg').pixmap(QSize(14, 14))
-        painter = QPainter(clock_pixmap)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-        painter.fillRect(clock_pixmap.rect(), QColor("#d0d0d1"))
-        painter.end()
-        clock_icon.setPixmap(clock_pixmap)
+        self.clock_icon.setPixmap(clock_pixmap)
         
         self.current_time_label = QLabel("00:00")
         self.current_time_label.setToolTip("Prochain créneau disponible")
-        clock_icon.setToolTip("Prochain créneau disponible")
-        current_time_layout.addWidget(clock_icon)
+        self.clock_icon.setToolTip("Prochain créneau disponible")
+        current_time_layout.addWidget(self.clock_icon)
         current_time_layout.addWidget(self.current_time_label)
         
         # Temps total avec icône de somme
         total_time_layout = QHBoxLayout()
         total_time_layout.setSpacing(5)
         
-        # Création de l'icône sigma colorée
-        total_icon = QLabel()
+        # Création de l'icône sigma
+        self.total_icon = QLabel()
         sigma_pixmap = self.load_svg_icon('sigma.svg').pixmap(QSize(14, 14))
-        painter = QPainter(sigma_pixmap)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-        painter.fillRect(sigma_pixmap.rect(), QColor("#d0d0d1"))
-        painter.end()
-        total_icon.setPixmap(sigma_pixmap)
+        self.total_icon.setPixmap(sigma_pixmap)
         
         self.total_time_label = QLabel("0h00")
         self.total_time_label.setToolTip("Temps saisie sur la journée")
-        total_icon.setToolTip("Temps saisie sur la journée")
-        total_time_layout.addWidget(total_icon)
+        self.total_icon.setToolTip("Temps saisie sur la journée")
+        total_time_layout.addWidget(self.total_icon)
         total_time_layout.addWidget(self.total_time_label)
         
         # Temps non synchronisé avec icône refresh-off.svg
         unsync_time_layout = QHBoxLayout()
         unsync_time_layout.setSpacing(5)
         
-        # Création de l'icône refresh-off colorée
-        unsync_icon = QLabel()
+        # Création de l'icône refresh-off
+        self.unsync_icon = QLabel()
         unsync_pixmap = self.load_svg_icon('refresh-off.svg').pixmap(QSize(14, 14))
-        painter = QPainter(unsync_pixmap)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-        painter.fillRect(unsync_pixmap.rect(), QColor("#d0d0d1"))
-        painter.end()
-        unsync_icon.setPixmap(unsync_pixmap)
+        self.unsync_icon.setPixmap(unsync_pixmap)
         
         self.unsync_time_label = QLabel("0h00")
         self.unsync_time_label.setToolTip("Temps non encore synchronisé")
-        unsync_icon.setToolTip("Temps non encore synchronisé")
-        unsync_time_layout.addWidget(unsync_icon)
+        self.unsync_icon.setToolTip("Temps non encore synchronisé")
+        unsync_time_layout.addWidget(self.unsync_icon)
         unsync_time_layout.addWidget(self.unsync_time_label)
 
         info_layout.addLayout(current_time_layout)
@@ -499,8 +511,9 @@ class LogTrackerApp(QMainWindow):
 
     def apply_theme_to_all(self, theme_name: str):
         """Applique le thème à toutes les fenêtres de l'application."""
-        theme = Theme(theme_name)
-        stylesheet = theme.get_stylesheet()
+        # Met à jour le thème courant
+        self.current_theme = Theme(theme_name)
+        stylesheet = self.current_theme.get_stylesheet()
         
         # Applique le thème à la fenêtre principale
         self.setStyleSheet(stylesheet)
@@ -516,6 +529,20 @@ class LogTrackerApp(QMainWindow):
         for dialog in dialogs:
             if dialog is not None:
                 dialog.setStyleSheet(stylesheet)
+
+        # Met à jour toutes les icônes avec la nouvelle couleur du thème
+        # Barre d'outils
+        self.add_button.setIcon(self.load_svg_icon('plus.svg'))
+        self.list_button.setIcon(self.load_svg_icon('list.svg'))
+        self.sync_button.setIcon(self.load_svg_icon('refresh.svg'))
+        self.new_ticket_button.setIcon(self.load_svg_icon('ticket-plus.svg'))
+        self.config_button.setIcon(self.load_svg_icon('settings.svg'))
+        self.projects_button.setIcon(self.load_svg_icon('projects.svg'))
+
+        # Barre de statut
+        self.clock_icon.setPixmap(self.load_svg_icon('clock.svg').pixmap(QSize(14, 14)))
+        self.total_icon.setPixmap(self.load_svg_icon('sigma.svg').pixmap(QSize(14, 14)))
+        self.unsync_icon.setPixmap(self.load_svg_icon('refresh-off.svg').pixmap(QSize(14, 14)))
 
     def show_sync_dialog(self):
         """Affiche la fenêtre de synchronisation."""
