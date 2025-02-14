@@ -5,3 +5,53 @@ Writes correct, up-to-date, secure code
 Never remove unedited content from files
 Focus on updates and additions rather than deletions
 Input: sanitize data, validate types, escape properly, secure uploads
+
+# Instructions personnalisées pour Windsurf IA
+
+Ces instructions sont destinées à guider Windsurf IA pour qu'il fournisse des suggestions de code conformes aux besoins de notre projet. Elles seront automatiquement ajoutées à chaque requête de Chat dans le contexte de ce dépôt.
+
+---
+
+## 1. Communication et ton de réponse
+- **Langue** : Toujours répondre en français.
+- **Hésitation si incertain** : Lorsque l’IA n’est pas sûre, utiliser des formulations comme « je ne sais pas exactement, mais voici une proposition » plutôt que de donner des affirmations catégoriques.
+- **Découpage par étapes** : Proposer des solutions en plusieurs étapes pour permettre une validation progressive par l’utilisateur.
+
+---
+
+## 2. Qualité du code et bonnes pratiques
+- **Lisibilité et maintenabilité** : Le code suggéré doit être clair, bien structuré et facile à maintenir.
+- **Utilisation des dernières pratiques** : Fournir du code à jour et conformes aux meilleures pratiques actuelles.
+- **Modification ciblée** : Préférer des changements incrémentaux (par exemple, ne pas effacer la fonction puis la réécrire pour moins de 30% modifier uniquement 10 à 20 % du code lorsque c’est suffisant) plutôt qu’une réécriture complète, sauf si le comportement doit être entièrement changé.
+
+---
+
+## 3. Approche non destructive
+- **Préservation du contenu** : Ne jamais supprimer de code non modifié. Les suggestions doivent se concentrer sur l’ajout ou la modification de parties spécifiques.
+- **Incrementalité** : Proposer des améliorations par étapes pour ne pas perturber la structure existante.
+
+---
+
+## 4. Sécurité et analyse statique (SAST)
+- **Validation et sanitisation** : S’assurer que toutes les entrées sont correctement validées, échappées et sanitizées.
+- **Respect des principes OWASP** : Les suggestions doivent tenir compte des bonnes pratiques de sécurité (prévention des injections, XSS, etc.) et recommander l’utilisation de contrôles d’accès appropriés.
+- **Signalement des vulnérabilités** : Identifier les éventuelles failles de sécurité et suggérer des correctifs ciblés sans réécrire entièrement le code, sauf en cas de nécessité absolue.
+
+---
+
+## 5. Organisation des modifications
+- **Modifications progressives** : Proposer d’abord une vue d’ensemble, puis découper les modifications en sous-étapes afin que l’utilisateur puisse valider chacune d’elles.
+- **Ajouts plutôt que suppressions** : Se concentrer sur l’ajout ou l’amélioration du code existant plutôt que sur sa suppression, sauf en cas de réécriture complète nécessaire pour changer le comportement.
+
+---
+
+## 6. Instructions spécifiques pour l’IA
+- **Adaptation au contexte** : Adapter les suggestions aux conventions et outils du projet (par exemple, utiliser des guillemets doubles et une indentation par tabulations pour le JavaScript, si cela est la norme).
+- **Interaction et itération** : Fournir une première ébauche puis proposer de travailler par itérations en fonction des retours de l’utilisateur.
+- **Référence au contexte** : Lorsque cela est pertinent, se référer aux spécificités du projet (par exemple, outils, bibliothèques, ou méthodologies adoptées).
+
+---
+
+*Inspiré notamment par les bonnes pratiques évoquées dans [cette vidéo](https://www.youtube.com/watch?v=aG-utUqVrb0) et par les recommandations couramment utilisées dans des projets sécurisés.*
+
+Ces instructions permettront à GitHub Copilot de fournir des réponses plus pertinentes, sécurisées et adaptées à notre environnement de développement.
